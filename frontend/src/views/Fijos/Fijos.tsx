@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { fijosApi, type GastoFijo, type GastoFijoCreate } from "../../api_client";
+import { fijosApi, categoriasApi, type GastoFijo, type GastoFijoCreate, type Categoria } from "../../api_client";
 import { getCotizacionDolar } from "../../lib/finance";
 import { Card } from "../../components/Card";
 import { Modal, ConfirmModal } from "../../components/Modal";
@@ -15,6 +15,7 @@ const EMPTY_FORM: GastoFijoCreate = {
   moneda: "ARS",
   mes: new Date().getMonth() + 1,
   anio: new Date().getFullYear(),
+  categoria: "Sin categoría",
 };
 
 function fmt(n: number, moneda: string) {
@@ -28,6 +29,7 @@ export default function Fijos() {
   const [mes, setMes]   = useState(now.getMonth() + 1);
 
   const [items, setItems]       = useState<GastoFijo[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [dolarRate, setDolarRate] = useState(0);
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
@@ -58,7 +60,10 @@ export default function Fijos() {
   }
 
   useEffect(() => { load(); }, [anio, mes]);
-  useEffect(() => { getCotizacionDolar().then(setDolarRate).catch(() => {}); }, []);
+  useEffect(() => {
+    getCotizacionDolar().then(setDolarRate).catch(() => {});
+    categoriasApi.list().then(setCategorias).catch(() => {});
+  }, []);
 
   function openAdd() {
     setForm({ ...EMPTY_FORM, mes, anio });
@@ -68,7 +73,7 @@ export default function Fijos() {
 
   function openEdit(item: GastoFijo) {
     // mes/anio = currently viewed month, so the change applies "from here forward"
-    setForm({ nombre: item.nombre, monto: item.monto, activo: item.activo, moneda: item.moneda, mes, anio });
+    setForm({ nombre: item.nombre, monto: item.monto, activo: item.activo, moneda: item.moneda, mes, anio, categoria: item.categoria || "Sin categoría" });
     setEditItem(item);
     setModal("edit");
   }
@@ -227,12 +232,21 @@ export default function Fijos() {
                 </select>
               </div>
             </div>
-            <div className="form__field">
-              <label className="form__label">Estado</label>
-              <select className="form__select" value={form.activo} onChange={(e) => setForm({ ...form, activo: parseInt(e.target.value) })}>
-                <option value={1}>Activo</option>
-                <option value={0}>Inactivo</option>
-              </select>
+            <div className="form__row">
+              <div className="form__field">
+                <label className="form__label">Categoría</label>
+                <select className="form__select" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}>
+                  <option value="Sin categoría">Sin categoría</option>
+                  {categorias.map((c) => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+                </select>
+              </div>
+              <div className="form__field">
+                <label className="form__label">Estado</label>
+                <select className="form__select" value={form.activo} onChange={(e) => setForm({ ...form, activo: parseInt(e.target.value) })}>
+                  <option value={1}>Activo</option>
+                  <option value={0}>Inactivo</option>
+                </select>
+              </div>
             </div>
             <div className="form__actions">
               <button type="button" className="btn-ghost" onClick={() => setModal(null)}>Cancelar</button>

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { resumenApi, type Resumen } from "../../api_client";
+import { resumenApi, resumenCategoriasApi, type Resumen, type CategoriaBreakdown } from "../../api_client";
 import { MetricCard } from "../../components/Card";
 import { Card } from "../../components/Card";
 import DonutChart, { type DonutSlice } from "../../components/DonutChart";
@@ -27,6 +27,7 @@ export default function Dashboard() {
   const [mes, setMes]   = useState(now.getMonth() + 1);
 
   const [resumen, setResumen] = useState<Resumen | null>(null);
+  const [catBreakdown, setCatBreakdown] = useState<CategoriaBreakdown[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
 
@@ -34,9 +35,11 @@ export default function Dashboard() {
     setLoading(true);
     setError(null);
 
-    resumenApi
-      .get(anio, mes)
-      .then(setResumen)
+    Promise.all([
+      resumenApi.get(anio, mes),
+      resumenCategoriasApi.get(anio, mes),
+    ])
+      .then(([r, cats]) => { setResumen(r); setCatBreakdown(cats); })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [anio, mes]);
@@ -270,6 +273,43 @@ export default function Dashboard() {
               </div>
             </Card>
           </div>
+
+          {/* Desglose por categoría */}
+          <Card>
+            <p className="dashboard__section-title">Desglose por Categoría</p>
+            {catBreakdown.length === 0 ? (
+              <p style={{ color: "var(--text-muted)", fontSize: "var(--text-sm)" }}>
+                Sin gastos categorizados este período.
+              </p>
+            ) : (
+              <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "var(--space-5) var(--space-8)", alignItems: "start" }}>
+                <DonutChart
+                  slices={catBreakdown.map((b) => ({ label: b.categoria, value: b.total, color: b.color }))}
+                  size={180}
+                  thickness={24}
+                  centerLabel="total"
+                  centerValue={fmtShort(catBreakdown.reduce((s, b) => s + b.total, 0))}
+                  formatValue={(v) => v.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 })}
+                />
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", alignSelf: "center" }}>
+                  {catBreakdown.map((b) => {
+                    const totalAll = catBreakdown.reduce((s, x) => s + x.total, 0);
+                    const pct = totalAll > 0 ? (b.total / totalAll) * 100 : 0;
+                    return (
+                      <div key={b.categoria} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                        <span style={{ width: 10, height: 10, borderRadius: "50%", background: b.color, flexShrink: 0 }} />
+                        <span style={{ flex: 1, fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>{b.categoria}</span>
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", minWidth: 36, textAlign: "right" }}>{pct.toFixed(0)}%</span>
+                        <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-medium)", minWidth: 90, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                          {fmt(b.total)}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </Card>
 
           {/* Desglose sueldo */}
           {(resumen.sueldo > 0 || resumen.otros > 0) && (

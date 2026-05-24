@@ -55,6 +55,7 @@ export interface GastoFijo {
   mes: number;
   anio: number;
   grupo_id: number;
+  categoria: string;
 }
 export type GastoFijoCreate = Omit<GastoFijo, "id" | "grupo_id">;
 
@@ -87,6 +88,7 @@ export interface Cuota {
   activa: number;
   moneda: string;
   tarjeta_id: number | null;
+  categoria: string;
 }
 export type CuotaCreate = Omit<Cuota, "id">;
 
@@ -126,6 +128,12 @@ export interface Categoria {
   activa: number;
 }
 export type CategoriaCreate = Omit<Categoria, "id" | "activa">;
+
+export interface CategoriaBreakdown {
+  categoria: string;
+  color: string;
+  total: number;
+}
 
 export interface CuotaProyectada {
   id: number;
@@ -225,7 +233,7 @@ export const gastosApi = {
 export const fijosApi = {
   list: async (anio: number, mes: number): Promise<GastoFijo[]> => {
     const { data, error } = await supabase
-      .from("gastos_fijos").select("id, nombre, monto, activo, moneda, mes, anio, grupo_id");
+      .from("gastos_fijos").select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria");
     const all = ok(data, error, []) as GastoFijo[];
     // Temporal filtering in TypeScript (mirrors the SQL subquery from FastAPI)
     const { getActiveFijosForMonth } = await import("./lib/finance");
@@ -238,7 +246,7 @@ export const fijosApi = {
     const { data, error } = await supabase
       .from("gastos_fijos")
       .insert({ ...body, user_id: userId, grupo_id: 0 })
-      .select("id, nombre, monto, activo, moneda, mes, anio, grupo_id")
+      .select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria")
       .single();
     const row = ok(data, error) as GastoFijo;
     await supabase.from("gastos_fijos").update({ grupo_id: row.id }).eq("id", row.id);
@@ -258,14 +266,14 @@ export const fijosApi = {
       // Same or earlier month → update in-place
       const { data, error } = await supabase
         .from("gastos_fijos").update(body).eq("id", id)
-        .select("id, nombre, monto, activo, moneda, mes, anio, grupo_id").single();
+        .select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria").single();
       return ok(data, error);
     } else {
       // Future month → new version, history preserved
       const { data, error } = await supabase
         .from("gastos_fijos")
         .insert({ ...body, user_id: userId, grupo_id: existing.grupo_id })
-        .select("id, nombre, monto, activo, moneda, mes, anio, grupo_id").single();
+        .select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria").single();
       return ok(data, error);
     }
   },
@@ -346,7 +354,7 @@ export const tarjetasApi = {
 
 // ─── Cuotas ───────────────────────────────────────────────────────────────────
 
-const CUOTA_COLS = "id, nombre, monto_cuota, cuota_actual, total_cuotas, mes_inicio, anio_inicio, activa, moneda, tarjeta_id";
+const CUOTA_COLS = "id, nombre, monto_cuota, cuota_actual, total_cuotas, mes_inicio, anio_inicio, activa, moneda, tarjeta_id, categoria";
 
 export const cuotasApi = {
   list: async (): Promise<Cuota[]> => {
@@ -482,10 +490,10 @@ export const historialApi = {
   get: async (meses: number): Promise<ResumenMes[]> => {
     const dolarRate = await getDolarRate();
     const [fijRes, ingRes, menRes, cuoRes, pauRes] = await Promise.all([
-      supabase.from("gastos_fijos").select("id, nombre, monto, activo, moneda, mes, anio, grupo_id"),
+      supabase.from("gastos_fijos").select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria"),
       supabase.from("ingresos").select("id, mes, anio, sueldo, otros"),
       supabase.from("gastos_mensuales").select("id, mes, anio, nombre, monto, categoria, moneda"),
-      supabase.from("cuotas").select("id, nombre, monto_cuota, cuota_actual, total_cuotas, mes_inicio, anio_inicio, activa, moneda, tarjeta_id").eq("activa", 1),
+      supabase.from("cuotas").select("id, nombre, monto_cuota, cuota_actual, total_cuotas, mes_inicio, anio_inicio, activa, moneda, tarjeta_id, categoria").eq("activa", 1),
       supabase.from("cuotas_pausadas").select("cuota_id, mes, anio"),
     ]);
     return calcularHistorial(
@@ -508,5 +516,72 @@ export const proyeccionApi = {
     const { data, error } = await supabase
       .from("cuotas").select(CUOTA_COLS).eq("activa", 1);
     return calcularProyeccion(ok(data, error, []), dolarRate, meses);
+  },
+};
+
+// ─── Desglose por Categoría ───────────────────────────────────────────────────
+
+export const resumenCategoriasApi = {
+  get: async (anio: number, mes: number): Promise<CategoriaBreakdown[]> => {
+    const dolarRate = await getDolarRate();
+
+    const [catRes, menRes, fijRes, cuoRes, pauRes] = await Promise.all([
+      supabase.from("categorias").select("nombre, color").eq("activa", 1),
+      supabase.from("gastos_mensuales").select("categoria, monto, moneda").eq("mes", mes).eq("anio", anio),
+      supabase.from("gastos_fijos").select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria"),
+      supabase.from("cuotas").select("id, monto_cuota, moneda, total_cuotas, mes_inicio, anio_inicio, activa, categoria").eq("activa", 1),
+      supabase.from("cuotas_pausadas").select("cuota_id").eq("mes", mes).eq("anio", anio),
+    ]);
+
+    // Map de categoria → color
+    const colorMap = new Map<string, string>(
+      (catRes.data ?? []).map((c: { nombre: string; color: string }) => [c.nombre, c.color])
+    );
+
+    const pausedIds = new Set<number>(
+      (pauRes.data ?? []).map((p: { cuota_id: number }) => p.cuota_id)
+    );
+
+    const totals = new Map<string, number>();
+    const toArs = (monto: number, moneda: string) => moneda === "USD" ? monto * dolarRate : monto;
+
+    // Gastos mensuales
+    for (const g of ok(menRes.data, menRes.error, []) as { categoria: string; monto: number; moneda: string }[]) {
+      const cat = g.categoria || "Sin categoría";
+      totals.set(cat, (totals.get(cat) ?? 0) + toArs(g.monto, g.moneda));
+    }
+
+    // Gastos fijos (activos para el mes)
+    const { getActiveFijosForMonth } = await import("./lib/finance");
+    const activeFijos = getActiveFijosForMonth(ok(fijRes.data, fijRes.error, []) as GastoFijo[], anio, mes);
+    for (const g of activeFijos) {
+      if (!g.activo) continue;
+      const cat = g.categoria || "Sin categoría";
+      totals.set(cat, (totals.get(cat) ?? 0) + toArs(g.monto, g.moneda));
+    }
+
+    // Cuotas activas para el mes
+    const mesIdx = anio * 12 + mes;
+    for (const c of ok(cuoRes.data, cuoRes.error, []) as { id: number; monto_cuota: number; moneda: string; total_cuotas: number; mes_inicio: number; anio_inicio: number; activa: number; categoria: string }[]) {
+      if (pausedIds.has(c.id)) continue;
+      const inicio = c.anio_inicio * 12 + c.mes_inicio;
+      const fin    = inicio + c.total_cuotas - 1;
+      if (mesIdx < inicio || mesIdx > fin) continue;
+      const cat = c.categoria || "Sin categoría";
+      totals.set(cat, (totals.get(cat) ?? 0) + toArs(c.monto_cuota, c.moneda));
+    }
+
+    const FALLBACK_COLORS: Record<string, string> = {
+      "Sin categoría": "#6b7280",
+    };
+
+    return Array.from(totals.entries())
+      .map(([categoria, total]) => ({
+        categoria,
+        color: colorMap.get(categoria) ?? FALLBACK_COLORS[categoria] ?? "#6366f1",
+        total,
+      }))
+      .filter((b) => b.total > 0)
+      .sort((a, b) => b.total - a.total);
   },
 };

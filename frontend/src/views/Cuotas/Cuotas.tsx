@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { cuotasApi, tarjetasApi, proyeccionApi, type Cuota, type CuotaCreate, type Tarjeta, type ProyeccionMes } from "../../api_client";
+import { cuotasApi, tarjetasApi, proyeccionApi, categoriasApi, type Cuota, type CuotaCreate, type Tarjeta, type ProyeccionMes, type Categoria } from "../../api_client";
 import { Card, MetricCard } from "../../components/Card";
 import { Modal, ConfirmModal } from "../../components/Modal";
 import BarChart, { type BarChartBar } from "../../components/BarChart";
@@ -25,7 +25,7 @@ const now = new Date();
 const EMPTY_FORM: CuotaCreate = {
   nombre: "", monto_cuota: 0, cuota_actual: 1, total_cuotas: 12,
   mes_inicio: now.getMonth() + 1, anio_inicio: now.getFullYear(),
-  activa: 1, moneda: "ARS", tarjeta_id: null,
+  activa: 1, moneda: "ARS", tarjeta_id: null, categoria: "Sin categoría",
 };
 
 type Tab = "lista" | "proyeccion";
@@ -36,6 +36,7 @@ export default function Cuotas() {
   // — Lista —
   const [items, setItems]       = useState<Cuota[]>([]);
   const [tarjetas, setTarjetas] = useState<Tarjeta[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
   const [modal, setModal]       = useState<"add" | "edit" | null>(null);
@@ -54,8 +55,8 @@ export default function Cuotas() {
 
   function load() {
     setLoading(true);
-    Promise.all([cuotasApi.list(), tarjetasApi.list()])
-      .then(([c, t]) => { setItems(c); setTarjetas(t); })
+    Promise.all([cuotasApi.list(), tarjetasApi.list(), categoriasApi.list()])
+      .then(([c, t, cats]) => { setItems(c); setTarjetas(t); setCategorias(cats); })
       .finally(() => setLoading(false));
   }
 
@@ -76,7 +77,8 @@ export default function Cuotas() {
   function openEdit(item: Cuota) {
     setForm({ nombre: item.nombre, monto_cuota: item.monto_cuota, cuota_actual: item.cuota_actual,
       total_cuotas: item.total_cuotas, mes_inicio: item.mes_inicio, anio_inicio: item.anio_inicio,
-      activa: item.activa, moneda: item.moneda, tarjeta_id: item.tarjeta_id });
+      activa: item.activa, moneda: item.moneda, tarjeta_id: item.tarjeta_id,
+      categoria: item.categoria || "Sin categoría" });
     setEditItem(item); setModal("edit");
   }
   async function handleSubmit(e: React.FormEvent) {
@@ -408,12 +410,21 @@ export default function Cuotas() {
                 </select>
               </div>
             )}
-            <div className="form__field">
-              <label className="form__label">Estado</label>
-              <select className="form__select" value={form.activa} onChange={(e) => setForm({ ...form, activa: parseInt(e.target.value) })}>
-                <option value={1}>Activa</option>
-                <option value={0}>Pausada</option>
-              </select>
+            <div className="form__row">
+              <div className="form__field">
+                <label className="form__label">Categoría</label>
+                <select className="form__select" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })}>
+                  <option value="Sin categoría">Sin categoría</option>
+                  {categorias.map((c) => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+                </select>
+              </div>
+              <div className="form__field">
+                <label className="form__label">Estado</label>
+                <select className="form__select" value={form.activa} onChange={(e) => setForm({ ...form, activa: parseInt(e.target.value) })}>
+                  <option value={1}>Activa</option>
+                  <option value={0}>Pausada</option>
+                </select>
+              </div>
             </div>
             <div className="form__actions">
               <button type="button" className="btn-ghost" onClick={() => setModal(null)}>Cancelar</button>
