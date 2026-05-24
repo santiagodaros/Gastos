@@ -7,7 +7,6 @@ export type ViewId =
   | "cuotas"
   | "sueldos"
   | "metas"
-  | "proyeccion"
   | "historial"
   | "categorias";
 
@@ -24,7 +23,6 @@ const NAV_ITEMS: NavItem[] = [
   { id: "cuotas",    label: "Cuotas",           icon: "⊞" },
   { id: "sueldos",   label: "Sueldos",          icon: "◎" },
   { id: "metas",       label: "Metas de Ahorro",  icon: "◇" },
-  { id: "proyeccion",  label: "Proyección",        icon: "▦" },
   { id: "historial",   label: "Historial",          icon: "◱" },
   { id: "categorias",  label: "Categorías",         icon: "◉" },
 ];
@@ -148,15 +146,6 @@ function NavIcon({ id }: { id: ViewId }) {
           <circle cx="12" cy="12" r="10" />
           <circle cx="12" cy="12" r="6" />
           <circle cx="12" cy="12" r="2" />
-        </svg>
-      );
-    case "proyeccion":
-      return (
-        <svg {...props}>
-          <line x1="18" y1="20" x2="18" y2="10" />
-          <line x1="12" y1="20" x2="12" y2="4" />
-          <line x1="6" y1="20" x2="6" y2="14" />
-          <line x1="2" y1="20" x2="22" y2="20" />
         </svg>
       );
     case "historial":

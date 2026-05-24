@@ -9,7 +9,6 @@ const VIEW_TITLES: Record<ViewId, string> = {
   cuotas:     "Cuotas",
   sueldos:    "Sueldos",
   metas:      "Metas de Ahorro",
-  proyeccion: "Proyección",
   historial:  "Historial",
   categorias: "Categorías",
 };
