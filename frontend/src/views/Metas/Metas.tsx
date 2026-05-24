@@ -9,6 +9,23 @@ function fmt(n: number) {
   return n.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
 }
 
+// Meses desde hoy hasta una fecha. Mínimo 1.
+function mesesHasta(fechaStr: string | null): number {
+  if (!fechaStr) return 12;
+  const fecha = new Date(fechaStr);
+  const hoy   = new Date();
+  const m = (fecha.getFullYear() - hoy.getFullYear()) * 12 + (fecha.getMonth() - hoy.getMonth());
+  return Math.max(1, m);
+}
+
+// Proyección con interés compuesto mensual a partir de TNA
+function proyectar(acumulado: number, tna: number, meses: number) {
+  if (tna <= 0 || acumulado <= 0) return { proyectado: acumulado, rendimiento: 0 };
+  const r = Math.pow(1 + tna / 100, 1 / 12) - 1;  // tasa mensual efectiva
+  const proyectado = acumulado * Math.pow(1 + r, meses);
+  return { proyectado, rendimiento: proyectado - acumulado };
+}
+
 const EMPTY_FORM: MetaAhorroCreate = {
   nombre: "",
   objetivo: 0,
@@ -16,6 +33,7 @@ const EMPTY_FORM: MetaAhorroCreate = {
   fecha_limite: null,
   prioridad: 2,
   activa: 1,
+  tasa_rendimiento: 0,
 };
 
 export default function Metas() {
@@ -46,7 +64,15 @@ export default function Metas() {
   }
 
   function openEdit(item: MetaAhorro) {
-    setForm({ nombre: item.nombre, objetivo: item.objetivo, acumulado: item.acumulado, fecha_limite: item.fecha_limite, prioridad: item.prioridad, activa: item.activa });
+    setForm({
+      nombre: item.nombre,
+      objetivo: item.objetivo,
+      acumulado: item.acumulado,
+      fecha_limite: item.fecha_limite,
+      prioridad: item.prioridad,
+      activa: item.activa,
+      tasa_rendimiento: item.tasa_rendimiento ?? 0,
+    });
     setEditItem(item);
     setModal("edit");
   }
@@ -136,13 +162,26 @@ export default function Metas() {
       ) : (
         <div className="metas-grid">
           {items.map((item) => {
-            const pct = item.objetivo > 0 ? Math.min(100, (item.acumulado / item.objetivo) * 100) : 0;
-            const pri = PRIORIDAD_LABEL[item.prioridad] ?? PRIORIDAD_LABEL[2];
+            const tna    = item.tasa_rendimiento ?? 0;
+            const meses  = mesesHasta(item.fecha_limite);
+            const { proyectado, rendimiento } = proyectar(item.acumulado, tna, meses);
+
+            const pct          = item.objetivo > 0 ? Math.min(100, (item.acumulado / item.objetivo) * 100) : 0;
+            const pctProyectado = item.objetivo > 0 ? Math.min(100, (proyectado / item.objetivo) * 100) : 0;
+
             const progressColor = pct >= 100 ? "var(--positive)" : pct >= 50 ? "var(--accent)" : "var(--warning)";
+            const pri = PRIORIDAD_LABEL[item.prioridad] ?? PRIORIDAD_LABEL[2];
+
+            // Label de horizonte temporal para el rendimiento
+            const horizonteLabel = item.fecha_limite
+              ? `al ${new Date(item.fecha_limite).toLocaleDateString("es-AR", { month: "short", year: "numeric" })}`
+              : "en 12 meses";
 
             return (
               <Card key={item.id} variant={pct >= 100 ? "positive" : "default"}>
                 <div className="meta-card">
+
+                  {/* Header */}
                   <div className="meta-card__header">
                     <span className="meta-card__nombre" style={{ opacity: item.activa ? 1 : 0.5 }}>
                       {item.nombre}
@@ -153,6 +192,7 @@ export default function Metas() {
                     </div>
                   </div>
 
+                  {/* Montos principales */}
                   <div className="meta-card__amounts">
                     <div>
                       <div className="meta-card__amount-label">Acumulado</div>
@@ -164,15 +204,32 @@ export default function Metas() {
                     </div>
                   </div>
 
+                  {/* Barra de progreso — dual si hay rendimiento */}
                   <div>
                     <div className="progress-bar" style={{ height: 8 }}>
-                      <div className="progress-bar__fill" style={{ width: `${pct}%`, background: progressColor }} />
+                      {tna > 0 && pctProyectado > pct ? (
+                        // Una sola barra con gradiente: sólido hasta el % actual, degradado hasta el proyectado
+                        <div
+                          className="progress-bar__fill"
+                          style={{
+                            width: `${pctProyectado}%`,
+                            background: `linear-gradient(to right, ${progressColor} ${((pct / Math.max(pctProyectado, 0.01)) * 100).toFixed(1)}%, color-mix(in srgb, ${progressColor} 28%, transparent) 100%)`,
+                          }}
+                        />
+                      ) : (
+                        <div className="progress-bar__fill" style={{ width: `${pct}%`, background: progressColor }} />
+                      )}
                     </div>
                     <div style={{ display: "flex", justifyContent: "space-between", marginTop: "var(--space-1)" }}>
                       <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
                         {pct.toFixed(0)}%{pct >= 100 ? " — ¡Completada!" : ""}
                       </span>
-                      {item.fecha_limite && (
+                      {tna > 0 && pctProyectado > pct && (
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+                          {pctProyectado.toFixed(0)}% proyectado
+                        </span>
+                      )}
+                      {!tna && item.fecha_limite && (
                         <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
                           Límite: {new Date(item.fecha_limite).toLocaleDateString("es-AR")}
                         </span>
@@ -180,8 +237,56 @@ export default function Metas() {
                     </div>
                   </div>
 
+                  {/* Panel de rendimiento — solo si tna > 0 */}
+                  {tna > 0 && (
+                    <div style={{
+                      background: "var(--bg-elevated)",
+                      borderRadius: "var(--radius)",
+                      padding: "var(--space-3)",
+                      border: "1px solid var(--border)",
+                    }}>
+                      {/* Encabezado del panel */}
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", display: "flex", alignItems: "center", gap: "var(--space-1)" }}>
+                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <line x1="12" y1="2" x2="12" y2="22"/>
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                          </svg>
+                          {tna}% TNA
+                        </span>
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+                          {horizonteLabel}
+                        </span>
+                      </div>
+                      {/* Valores */}
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                        <div>
+                          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 2 }}>
+                            Rend. estimado
+                          </div>
+                          <div style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-semibold)", color: "var(--positive)", fontVariantNumeric: "tabular-nums" }}>
+                            +{fmt(rendimiento)}
+                          </div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 2 }}>
+                            Valor proyectado
+                          </div>
+                          <div style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-bold)", color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>
+                            {fmt(proyectado)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Acciones */}
                   <div className="meta-card__actions">
-                    <button className="btn-ghost" style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-3)" }} onClick={() => openDepositar(item)}>
+                    <button
+                      className="btn-ghost"
+                      style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-3)" }}
+                      onClick={() => openDepositar(item)}
+                    >
                       + Depositar
                     </button>
                     <div style={{ display: "flex", gap: "var(--space-1)" }}>
@@ -199,6 +304,7 @@ export default function Metas() {
                       </button>
                     </div>
                   </div>
+
                 </div>
               </Card>
             );
@@ -212,22 +318,48 @@ export default function Metas() {
           <form className="form" onSubmit={handleSubmit}>
             <div className="form__field">
               <label className="form__label">Nombre</label>
-              <input className="form__input" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} placeholder="Ej: Viaje, auto, fondo de emergencia..." required autoFocus />
+              <input
+                className="form__input"
+                value={form.nombre}
+                onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                placeholder="Ej: Viaje, auto, fondo de emergencia..."
+                required
+                autoFocus
+              />
             </div>
             <div className="form__row">
               <div className="form__field">
                 <label className="form__label">Objetivo</label>
-                <input className="form__input" type="number" min={0} step="0.01" value={form.objetivo || ""} onChange={(e) => setForm({ ...form, objetivo: parseFloat(e.target.value) || 0 })} required />
+                <input
+                  className="form__input"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.objetivo || ""}
+                  onChange={(e) => setForm({ ...form, objetivo: parseFloat(e.target.value) || 0 })}
+                  required
+                />
               </div>
               <div className="form__field">
                 <label className="form__label">Acumulado</label>
-                <input className="form__input" type="number" min={0} step="0.01" value={form.acumulado || ""} onChange={(e) => setForm({ ...form, acumulado: parseFloat(e.target.value) || 0 })} />
+                <input
+                  className="form__input"
+                  type="number"
+                  min={0}
+                  step="0.01"
+                  value={form.acumulado || ""}
+                  onChange={(e) => setForm({ ...form, acumulado: parseFloat(e.target.value) || 0 })}
+                />
               </div>
             </div>
             <div className="form__row">
               <div className="form__field">
                 <label className="form__label">Prioridad</label>
-                <select className="form__select" value={form.prioridad} onChange={(e) => setForm({ ...form, prioridad: parseInt(e.target.value) })}>
+                <select
+                  className="form__select"
+                  value={form.prioridad}
+                  onChange={(e) => setForm({ ...form, prioridad: parseInt(e.target.value) })}
+                >
                   <option value={1}>Alta</option>
                   <option value={2}>Media</option>
                   <option value={3}>Baja</option>
@@ -235,15 +367,41 @@ export default function Metas() {
               </div>
               <div className="form__field">
                 <label className="form__label">Estado</label>
-                <select className="form__select" value={form.activa} onChange={(e) => setForm({ ...form, activa: parseInt(e.target.value) })}>
+                <select
+                  className="form__select"
+                  value={form.activa}
+                  onChange={(e) => setForm({ ...form, activa: parseInt(e.target.value) })}
+                >
                   <option value={1}>Activa</option>
                   <option value={0}>Inactiva</option>
                 </select>
               </div>
             </div>
-            <div className="form__field">
-              <label className="form__label">Fecha límite (opcional)</label>
-              <input className="form__input" type="date" value={form.fecha_limite ?? ""} onChange={(e) => setForm({ ...form, fecha_limite: e.target.value || null })} />
+            <div className="form__row">
+              <div className="form__field">
+                <label className="form__label">Fecha límite <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(opcional)</span></label>
+                <input
+                  className="form__input"
+                  type="date"
+                  value={form.fecha_limite ?? ""}
+                  onChange={(e) => setForm({ ...form, fecha_limite: e.target.value || null })}
+                />
+              </div>
+              <div className="form__field">
+                <label className="form__label">
+                  TNA % <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(rendimiento)</span>
+                </label>
+                <input
+                  className="form__input"
+                  type="number"
+                  min={0}
+                  max={999}
+                  step="0.1"
+                  value={form.tasa_rendimiento || ""}
+                  onChange={(e) => setForm({ ...form, tasa_rendimiento: parseFloat(e.target.value) || 0 })}
+                  placeholder="Ej: 85"
+                />
+              </div>
             </div>
             <div className="form__actions">
               <button type="button" className="btn-ghost" onClick={() => setModal(null)}>Cancelar</button>
@@ -263,11 +421,22 @@ export default function Metas() {
             </div>
             <div className="form__field">
               <label className="form__label">Monto a depositar</label>
-              <input className="form__input" type="number" min={0.01} step="0.01" value={deposito || ""} onChange={(e) => setDeposito(parseFloat(e.target.value) || 0)} required autoFocus />
+              <input
+                className="form__input"
+                type="number"
+                min={0.01}
+                step="0.01"
+                value={deposito || ""}
+                onChange={(e) => setDeposito(parseFloat(e.target.value) || 0)}
+                required
+                autoFocus
+              />
             </div>
             <div className="form__actions">
               <button type="button" className="btn-ghost" onClick={() => setModal(null)}>Cancelar</button>
-              <button type="submit" className="btn-primary" disabled={saving || deposito <= 0}>{saving ? "Procesando..." : "Depositar"}</button>
+              <button type="submit" className="btn-primary" disabled={saving || deposito <= 0}>
+                {saving ? "Procesando..." : "Depositar"}
+              </button>
             </div>
           </form>
         </Modal>

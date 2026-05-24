@@ -103,6 +103,7 @@ export interface MetaAhorro {
   fecha_limite: string | null;
   prioridad: number;
   activa: number;
+  tasa_rendimiento: number;
 }
 export type MetaAhorroCreate = Omit<MetaAhorro, "id">;
 
@@ -406,7 +407,7 @@ export const cuotasApi = {
 
 // ─── Metas de Ahorro ──────────────────────────────────────────────────────────
 
-const META_COLS = "id, nombre, objetivo, acumulado, fecha_limite, prioridad, activa";
+const META_COLS = "id, nombre, objetivo, acumulado, fecha_limite, prioridad, activa, tasa_rendimiento";
 
 export const metasApi = {
   list: async (): Promise<MetaAhorro[]> => {
