@@ -22,15 +22,17 @@
 .layout__topbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: var(--space-3);
   padding: 0 var(--space-8);
   height: 64px;
   min-height: 64px;
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-base);
+  flex-shrink: 0;
 }
 
 .layout__topbar-title {
+  flex: 1;
   font-size: var(--text-lg);
   font-weight: var(--font-semibold);
   color: var(--text-primary);
@@ -40,6 +42,7 @@
 .layout__topbar-meta {
   font-size: var(--text-sm);
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
 /* --- Main scrollable area --- */
@@ -48,4 +51,58 @@
   overflow-y: auto;
   overflow-x: hidden;
   padding: var(--space-8);
+}
+
+/* --- Hamburger (solo visible en mobile) --- */
+.layout__hamburger {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: var(--radius);
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: color var(--transition-fast), background var(--transition-fast);
+  flex-shrink: 0;
+}
+.layout__hamburger:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+/* --- Overlay backdrop (mobile sidebar) --- */
+.layout__overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: calc(var(--z-sidebar) - 1);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+/* ============================================================
+   MOBILE BREAKPOINT (< 768px)
+   ============================================================ */
+@media (max-width: 767px) {
+  .layout__hamburger {
+    display: flex;
+  }
+
+  .layout__topbar {
+    padding: 0 var(--space-4);
+    height: 56px;
+    min-height: 56px;
+  }
+
+  .layout__topbar-meta {
+    display: none; /* la fecha ocupa mucho espacio en mobile */
+  }
+
+  .layout__main {
+    padding: var(--space-4);
+  }
 }

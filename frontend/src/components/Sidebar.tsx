@@ -36,6 +36,7 @@ interface SidebarProps {
   theme: Theme;
   onToggleTheme: () => void;
   onSignOut: () => void;
+  mobileOpen?: boolean;
 }
 
 export default function Sidebar({
@@ -46,9 +47,16 @@ export default function Sidebar({
   theme,
   onToggleTheme,
   onSignOut,
+  mobileOpen = false,
 }: SidebarProps) {
+  const classes = [
+    "sidebar",
+    collapsed ? "collapsed" : "",
+    mobileOpen ? "mobile-open" : "",
+  ].filter(Boolean).join(" ");
+
   return (
-    <aside className={`sidebar${collapsed ? " collapsed" : ""}`}>
+    <aside className={classes}>
       {/* Brand */}
       <div className="sidebar__brand">
         <div className="sidebar__brand-icon">

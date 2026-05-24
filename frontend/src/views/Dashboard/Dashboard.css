@@ -23,6 +23,17 @@
   gap: var(--space-4);
 }
 
+@media (max-width: 767px) {
+  .dashboard__metrics {
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-3);
+  }
+
+  .dashboard {
+    gap: var(--space-5);
+  }
+}
+
 /* --- Content row --- */
 .dashboard__content {
   display: grid;
@@ -33,6 +44,26 @@
 @media (max-width: 900px) {
   .dashboard__content {
     grid-template-columns: 1fr;
+  }
+}
+
+/* --- Desglose por categoría --- */
+.cat-breakdown {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: var(--space-5) var(--space-8);
+  align-items: start;
+}
+
+@media (max-width: 767px) {
+  .cat-breakdown {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    gap: var(--space-5);
+  }
+
+  .cat-breakdown__legend {
+    width: 100%;
   }
 }
 

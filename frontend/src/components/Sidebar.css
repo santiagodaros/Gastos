@@ -2,6 +2,44 @@
    SIDEBAR — Gestor Gastos
    ============================================================ */
 
+/* ── MOBILE DRAWER (< 768px) ─────────────────────────────────
+   En mobile el sidebar es un drawer fijo, oculto por defecto.
+   Se muestra con la clase .mobile-open vía transform.
+   ─────────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .sidebar {
+    position: fixed !important;
+    top: 0;
+    left: 0;
+    height: 100% !important;
+    width: 260px !important;
+    min-width: 260px !important;
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    z-index: var(--z-sidebar);
+    box-shadow: none;
+  }
+
+  .sidebar.mobile-open {
+    transform: translateX(0);
+    box-shadow: var(--shadow-lg);
+  }
+
+  /* En mobile siempre mostrar labels (ignorar estado collapsed) */
+  .sidebar .sidebar__item-label,
+  .sidebar .sidebar__section-label,
+  .sidebar .sidebar__toggle-label,
+  .sidebar .sidebar__brand-text {
+    opacity: 1 !important;
+  }
+
+  /* Ocultar el botón de colapsar en mobile (no tiene sentido) */
+  .sidebar__toggle {
+    display: none !important;
+  }
+}
+
+
 .sidebar {
   position: relative;
   display: flex;

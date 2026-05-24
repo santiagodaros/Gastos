@@ -73,11 +73,20 @@
   font-variant-numeric: tabular-nums;
 }
 
-@media (max-width: 700px) {
+@media (max-width: 767px) {
+  .historial {
+    gap: var(--space-4);
+  }
+
   .historial__charts {
     grid-template-columns: 1fr;
   }
+
   .historial__stats {
     grid-template-columns: 1fr 1fr;
+  }
+
+  .historial__toolbar {
+    flex-wrap: wrap;
   }
 }

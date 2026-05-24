@@ -12,6 +12,13 @@
   transition: border-color var(--transition-base), box-shadow var(--transition-base);
 }
 
+@media (max-width: 767px) {
+  .card {
+    padding: var(--space-4);
+    overflow-x: auto; /* permite scroll horizontal de tablas en mobile */
+  }
+}
+
 .card::before {
   content: "";
   position: absolute;

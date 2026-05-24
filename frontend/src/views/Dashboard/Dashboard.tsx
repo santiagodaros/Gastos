@@ -282,16 +282,16 @@ export default function Dashboard() {
                 Sin gastos categorizados este período.
               </p>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", gap: "var(--space-5) var(--space-8)", alignItems: "start" }}>
+              <div className="cat-breakdown">
                 <DonutChart
                   slices={catBreakdown.map((b) => ({ label: b.categoria, value: b.total, color: b.color }))}
-                  size={180}
-                  thickness={24}
+                  size={170}
+                  thickness={22}
                   centerLabel="total"
                   centerValue={fmtShort(catBreakdown.reduce((s, b) => s + b.total, 0))}
                   formatValue={(v) => v.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 })}
                 />
-                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", alignSelf: "center" }}>
+                <div className="cat-breakdown__legend" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", alignSelf: "center" }}>
                   {catBreakdown.map((b) => {
                     const totalAll = catBreakdown.reduce((s, x) => s + x.total, 0);
                     const pct = totalAll > 0 ? (b.total / totalAll) * 100 : 0;
@@ -299,8 +299,8 @@ export default function Dashboard() {
                       <div key={b.categoria} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
                         <span style={{ width: 10, height: 10, borderRadius: "50%", background: b.color, flexShrink: 0 }} />
                         <span style={{ flex: 1, fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>{b.categoria}</span>
-                        <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", minWidth: 36, textAlign: "right" }}>{pct.toFixed(0)}%</span>
-                        <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-medium)", minWidth: 90, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", minWidth: 32, textAlign: "right" }}>{pct.toFixed(0)}%</span>
+                        <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-medium)", minWidth: 85, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>
                           {fmt(b.total)}
                         </span>
                       </div>
