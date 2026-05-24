@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { fijosApi, type GastoFijo, type GastoFijoCreate } from "../../api_client";
+import { getCotizacionDolar } from "../../lib/finance";
 import { Card } from "../../components/Card";
 import { Modal, ConfirmModal } from "../../components/Modal";
 import PeriodSelector from "../../components/PeriodSelector";
@@ -27,6 +28,7 @@ export default function Fijos() {
   const [mes, setMes]   = useState(now.getMonth() + 1);
 
   const [items, setItems]       = useState<GastoFijo[]>([]);
+  const [dolarRate, setDolarRate] = useState(0);
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
   const [error, setError]       = useState<string | null>(null);
@@ -56,6 +58,7 @@ export default function Fijos() {
   }
 
   useEffect(() => { load(); }, [anio, mes]);
+  useEffect(() => { getCotizacionDolar().then(setDolarRate).catch(() => {}); }, []);
 
   function openAdd() {
     setForm({ ...EMPTY_FORM, mes, anio });
@@ -100,8 +103,10 @@ export default function Fijos() {
     }
   }
 
-  const activos   = items.filter((i) => i.activo);
-  const totalARS  = items.filter((i) => i.moneda === "ARS" && i.activo).reduce((s, i) => s + i.monto, 0);
+  const activos  = items.filter((i) => i.activo);
+  const totalARS = activos.reduce((s, i) => {
+    return s + (i.moneda === "USD" ? i.monto * dolarRate : i.monto);
+  }, 0);
 
   return (
     <div className="abm">
@@ -176,6 +181,7 @@ export default function Fijos() {
               <tr>
                 <td colSpan={2} style={{ paddingTop: "var(--space-4)", fontSize: "var(--text-xs)", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                   Total activos ARS
+                  {dolarRate > 0 && <span style={{ display: "block", marginTop: 2, textTransform: "none", letterSpacing: 0 }}>USD @ {fmt(dolarRate, "ARS")}</span>}
                 </td>
                 <td className="num" style={{ paddingTop: "var(--space-4)", color: "var(--text-primary)", fontWeight: "var(--font-bold)" }}>
                   {fmt(totalARS, "ARS")}

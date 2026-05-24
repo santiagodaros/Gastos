@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { gastosApi, categoriasApi, type GastoMensual, type GastoMensualCreate, type Categoria } from "../../api_client";
+import { getCotizacionDolar } from "../../lib/finance";
 import { Card } from "../../components/Card";
 import { Modal, ConfirmModal } from "../../components/Modal";
 import PeriodSelector from "../../components/PeriodSelector";
@@ -29,6 +30,7 @@ export default function GastosMensuales() {
 
   const [items, setItems]           = useState<GastoMensual[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [dolarRate, setDolarRate]   = useState(0);
   const [loading, setLoading]       = useState(true);
   const [saving, setSaving]         = useState(false);
   const [error, setError]           = useState<string | null>(null);
@@ -60,6 +62,7 @@ export default function GastosMensuales() {
   useEffect(() => { load(); }, [anio, mes]);
   useEffect(() => {
     categoriasApi.list().then(setCategorias).catch(() => {});
+    getCotizacionDolar().then(setDolarRate).catch(() => {});
   }, []);
 
   function openAdd() {
@@ -104,7 +107,7 @@ export default function GastosMensuales() {
     }
   }
 
-  const total = items.reduce((s, i) => i.moneda === "ARS" ? s + i.monto : s, 0);
+  const total = items.reduce((s, i) => s + (i.moneda === "USD" ? i.monto * dolarRate : i.monto), 0);
 
   return (
     <div className="abm">
@@ -184,6 +187,9 @@ export default function GastosMensuales() {
               <tr>
                 <td colSpan={2} style={{ paddingTop: "var(--space-4)", fontSize: "var(--text-xs)", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                   Total ARS
+                  {dolarRate > 0 && items.some((i) => i.moneda === "USD") && (
+                    <span style={{ display: "block", marginTop: 2, textTransform: "none", letterSpacing: 0 }}>USD @ {fmt(dolarRate, "ARS")}</span>
+                  )}
                 </td>
                 <td className="num" style={{ paddingTop: "var(--space-4)", color: "var(--text-primary)", fontWeight: "var(--font-bold)" }}>
                   {fmt(total, "ARS")}
