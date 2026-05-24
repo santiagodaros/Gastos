@@ -25,7 +25,7 @@ const now = new Date();
 const EMPTY_FORM: CuotaCreate = {
   nombre: "", monto_cuota: 0, cuota_actual: 1, total_cuotas: 12,
   mes_inicio: now.getMonth() + 1, anio_inicio: now.getFullYear(),
-  activa: 1, moneda: "ARS", tarjeta_id: null, categoria: "Sin categoría",
+  activa: 1, moneda: "ARS", tarjeta_id: null, categoria: "Sin categoría", nota: null,
 };
 
 type Tab = "lista" | "proyeccion";
@@ -78,7 +78,7 @@ export default function Cuotas() {
     setForm({ nombre: item.nombre, monto_cuota: item.monto_cuota, cuota_actual: item.cuota_actual,
       total_cuotas: item.total_cuotas, mes_inicio: item.mes_inicio, anio_inicio: item.anio_inicio,
       activa: item.activa, moneda: item.moneda, tarjeta_id: item.tarjeta_id,
-      categoria: item.categoria || "Sin categoría" });
+      categoria: item.categoria || "Sin categoría", nota: item.nota ?? null });
     setEditItem(item); setModal("edit");
   }
   async function handleSubmit(e: React.FormEvent) {
@@ -186,11 +186,12 @@ export default function Cuotas() {
                     const pct = item.total_cuotas > 0 ? (item.cuota_actual / item.total_cuotas) * 100 : 0;
                     return (
                       <tr key={item.id} style={{ opacity: item.activa ? 1 : 0.45 }}>
-                        <td style={{ color: "var(--text-primary)", fontWeight: "var(--font-medium)" }}>
-                          {item.nombre}
+                        <td>
+                          <span style={{ color: "var(--text-primary)", fontWeight: "var(--font-medium)" }}>{item.nombre}</span>
                           <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 }}>
                             Inicio: {MONTHS[item.mes_inicio - 1]} {item.anio_inicio}
                           </div>
+                          {item.nota && <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 1 }}>{item.nota}</div>}
                         </td>
                         <td style={{ minWidth: 120 }}>
                           <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
@@ -425,6 +426,17 @@ export default function Cuotas() {
                   <option value={0}>Pausada</option>
                 </select>
               </div>
+            </div>
+            <div className="form__field">
+              <label className="form__label">Nota <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(opcional)</span></label>
+              <textarea
+                className="form__input"
+                value={form.nota ?? ""}
+                onChange={(e) => setForm({ ...form, nota: e.target.value || null })}
+                placeholder="Ej: compré la tele en Cetrogar, 12 cuotas sin interés..."
+                rows={2}
+                style={{ resize: "vertical" }}
+              />
             </div>
             <div className="form__actions">
               <button type="button" className="btn-ghost" onClick={() => setModal(null)}>Cancelar</button>

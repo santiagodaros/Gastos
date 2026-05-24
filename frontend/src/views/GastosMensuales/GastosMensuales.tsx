@@ -16,6 +16,7 @@ const EMPTY_FORM: GastoMensualCreate = {
   monto: 0,
   categoria: "Otros",
   moneda: "ARS",
+  nota: null,
 };
 
 function fmt(n: number, moneda: string) {
@@ -72,7 +73,7 @@ export default function GastosMensuales() {
   }
 
   function openEdit(item: GastoMensual) {
-    setForm({ mes: item.mes, anio: item.anio, nombre: item.nombre, monto: item.monto, categoria: item.categoria, moneda: item.moneda });
+    setForm({ mes: item.mes, anio: item.anio, nombre: item.nombre, monto: item.monto, categoria: item.categoria, moneda: item.moneda, nota: item.nota ?? null });
     setEditItem(item);
     setModal("edit");
   }
@@ -151,7 +152,10 @@ export default function GastosMensuales() {
             <tbody>
               {items.map((item) => (
                 <tr key={item.id}>
-                  <td style={{ color: "var(--text-primary)", fontWeight: "var(--font-medium)" }}>{item.nombre}</td>
+                  <td>
+                    <span style={{ color: "var(--text-primary)", fontWeight: "var(--font-medium)" }}>{item.nombre}</span>
+                    {item.nota && <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 }}>{item.nota}</div>}
+                  </td>
                   <td>
                     {(() => {
                       const cat = categorias.find((c) => c.nombre === item.categoria);
@@ -255,6 +259,17 @@ export default function GastosMensuales() {
                   : <option value={form.categoria}>{form.categoria}</option>
                 }
               </select>
+            </div>
+            <div className="form__field">
+              <label className="form__label">Nota <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(opcional)</span></label>
+              <textarea
+                className="form__input"
+                value={form.nota ?? ""}
+                onChange={(e) => setForm({ ...form, nota: e.target.value || null })}
+                placeholder="Ej: factura de enero, viaje a Mendoza..."
+                rows={2}
+                style={{ resize: "vertical" }}
+              />
             </div>
             <div className="form__actions">
               <button type="button" className="btn-ghost" onClick={() => setModal(null)}>Cancelar</button>

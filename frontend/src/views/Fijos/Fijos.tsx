@@ -16,6 +16,7 @@ const EMPTY_FORM: GastoFijoCreate = {
   mes: new Date().getMonth() + 1,
   anio: new Date().getFullYear(),
   categoria: "Sin categoría",
+  nota: null,
 };
 
 function fmt(n: number, moneda: string) {
@@ -73,7 +74,7 @@ export default function Fijos() {
 
   function openEdit(item: GastoFijo) {
     // mes/anio = currently viewed month, so the change applies "from here forward"
-    setForm({ nombre: item.nombre, monto: item.monto, activo: item.activo, moneda: item.moneda, mes, anio, categoria: item.categoria || "Sin categoría" });
+    setForm({ nombre: item.nombre, monto: item.monto, activo: item.activo, moneda: item.moneda, mes, anio, categoria: item.categoria || "Sin categoría", nota: item.nota ?? null });
     setEditItem(item);
     setModal("edit");
   }
@@ -156,7 +157,10 @@ export default function Fijos() {
             <tbody>
               {items.map((item) => (
                 <tr key={item.id} style={{ opacity: item.activo ? 1 : 0.45 }}>
-                  <td style={{ color: "var(--text-primary)", fontWeight: "var(--font-medium)" }}>{item.nombre}</td>
+                  <td>
+                    <span style={{ color: "var(--text-primary)", fontWeight: "var(--font-medium)" }}>{item.nombre}</span>
+                    {item.nota && <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 }}>{item.nota}</div>}
+                  </td>
                   <td>
                     <span className={`badge ${item.activo ? "badge--positive" : "badge--neutral"}`}>
                       {item.activo ? "Activo" : "Inactivo"}
@@ -247,6 +251,17 @@ export default function Fijos() {
                   <option value={0}>Inactivo</option>
                 </select>
               </div>
+            </div>
+            <div className="form__field">
+              <label className="form__label">Nota <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(opcional)</span></label>
+              <textarea
+                className="form__input"
+                value={form.nota ?? ""}
+                onChange={(e) => setForm({ ...form, nota: e.target.value || null })}
+                placeholder="Ej: contrato vence en diciembre..."
+                rows={2}
+                style={{ resize: "vertical" }}
+              />
             </div>
             <div className="form__actions">
               <button type="button" className="btn-ghost" onClick={() => setModal(null)}>Cancelar</button>

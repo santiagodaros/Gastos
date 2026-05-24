@@ -43,6 +43,7 @@ export interface GastoMensual {
   monto: number;
   categoria: string;
   moneda: string;
+  nota?: string | null;
 }
 export type GastoMensualCreate = Omit<GastoMensual, "id">;
 
@@ -56,6 +57,7 @@ export interface GastoFijo {
   anio: number;
   grupo_id: number;
   categoria: string;
+  nota?: string | null;
 }
 export type GastoFijoCreate = Omit<GastoFijo, "id" | "grupo_id">;
 
@@ -89,6 +91,7 @@ export interface Cuota {
   moneda: string;
   tarjeta_id: number | null;
   categoria: string;
+  nota?: string | null;
 }
 export type CuotaCreate = Omit<Cuota, "id">;
 
@@ -204,7 +207,7 @@ export const resumenApi = {
 export const gastosApi = {
   list: async (anio: number, mes: number): Promise<GastoMensual[]> => {
     const { data, error } = await supabase
-      .from("gastos_mensuales").select("id, mes, anio, nombre, monto, categoria, moneda")
+      .from("gastos_mensuales").select("id, mes, anio, nombre, monto, categoria, moneda, nota")
       .eq("mes", mes).eq("anio", anio).order("id");
     return ok(data, error, []);
   },
@@ -233,7 +236,7 @@ export const gastosApi = {
 export const fijosApi = {
   list: async (anio: number, mes: number): Promise<GastoFijo[]> => {
     const { data, error } = await supabase
-      .from("gastos_fijos").select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria");
+      .from("gastos_fijos").select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria, nota");
     const all = ok(data, error, []) as GastoFijo[];
     // Temporal filtering in TypeScript (mirrors the SQL subquery from FastAPI)
     const { getActiveFijosForMonth } = await import("./lib/finance");
@@ -246,7 +249,7 @@ export const fijosApi = {
     const { data, error } = await supabase
       .from("gastos_fijos")
       .insert({ ...body, user_id: userId, grupo_id: 0 })
-      .select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria")
+      .select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria, nota")
       .single();
     const row = ok(data, error) as GastoFijo;
     await supabase.from("gastos_fijos").update({ grupo_id: row.id }).eq("id", row.id);
@@ -266,14 +269,14 @@ export const fijosApi = {
       // Same or earlier month → update in-place
       const { data, error } = await supabase
         .from("gastos_fijos").update(body).eq("id", id)
-        .select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria").single();
+        .select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria, nota").single();
       return ok(data, error);
     } else {
       // Future month → new version, history preserved
       const { data, error } = await supabase
         .from("gastos_fijos")
         .insert({ ...body, user_id: userId, grupo_id: existing.grupo_id })
-        .select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria").single();
+        .select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria, nota").single();
       return ok(data, error);
     }
   },
@@ -354,7 +357,7 @@ export const tarjetasApi = {
 
 // ─── Cuotas ───────────────────────────────────────────────────────────────────
 
-const CUOTA_COLS = "id, nombre, monto_cuota, cuota_actual, total_cuotas, mes_inicio, anio_inicio, activa, moneda, tarjeta_id, categoria";
+const CUOTA_COLS = "id, nombre, monto_cuota, cuota_actual, total_cuotas, mes_inicio, anio_inicio, activa, moneda, tarjeta_id, categoria, nota";
 
 export const cuotasApi = {
   list: async (): Promise<Cuota[]> => {
@@ -490,9 +493,9 @@ export const historialApi = {
   get: async (meses: number): Promise<ResumenMes[]> => {
     const dolarRate = await getDolarRate();
     const [fijRes, ingRes, menRes, cuoRes, pauRes] = await Promise.all([
-      supabase.from("gastos_fijos").select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria"),
+      supabase.from("gastos_fijos").select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria, nota"),
       supabase.from("ingresos").select("id, mes, anio, sueldo, otros"),
-      supabase.from("gastos_mensuales").select("id, mes, anio, nombre, monto, categoria, moneda"),
+      supabase.from("gastos_mensuales").select("id, mes, anio, nombre, monto, categoria, moneda, nota"),
       supabase.from("cuotas").select("id, nombre, monto_cuota, cuota_actual, total_cuotas, mes_inicio, anio_inicio, activa, moneda, tarjeta_id, categoria").eq("activa", 1),
       supabase.from("cuotas_pausadas").select("cuota_id, mes, anio"),
     ]);
@@ -528,7 +531,7 @@ export const resumenCategoriasApi = {
     const [catRes, menRes, fijRes, cuoRes, pauRes] = await Promise.all([
       supabase.from("categorias").select("nombre, color").eq("activa", 1),
       supabase.from("gastos_mensuales").select("categoria, monto, moneda").eq("mes", mes).eq("anio", anio),
-      supabase.from("gastos_fijos").select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria"),
+      supabase.from("gastos_fijos").select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria, nota"),
       supabase.from("cuotas").select("id, monto_cuota, moneda, total_cuotas, mes_inicio, anio_inicio, activa, categoria").eq("activa", 1),
       supabase.from("cuotas_pausadas").select("cuota_id").eq("mes", mes).eq("anio", anio),
     ]);

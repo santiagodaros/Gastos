@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { resumenApi, resumenCategoriasApi, type Resumen, type CategoriaBreakdown } from "../../api_client";
+import { resumenApi, resumenCategoriasApi, cuotasApi, type Resumen, type CategoriaBreakdown, type Cuota } from "../../api_client";
 import { MetricCard } from "../../components/Card";
 import { Card } from "../../components/Card";
 import DonutChart, { type DonutSlice } from "../../components/DonutChart";
@@ -28,6 +28,7 @@ export default function Dashboard() {
 
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [catBreakdown, setCatBreakdown] = useState<CategoriaBreakdown[]>([]);
+  const [cuotasPronto, setCuotasPronto] = useState<(Cuota & { remaining: number })[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
 
@@ -35,11 +36,28 @@ export default function Dashboard() {
     setLoading(true);
     setError(null);
 
+    const currentPeriod = now.getFullYear() * 12 + now.getMonth() + 1;
+
     Promise.all([
       resumenApi.get(anio, mes),
       resumenCategoriasApi.get(anio, mes),
+      cuotasApi.list(),
     ])
-      .then(([r, cats]) => { setResumen(r); setCatBreakdown(cats); })
+      .then(([r, cats, cuotas]) => {
+        setResumen(r);
+        setCatBreakdown(cats);
+        // Cuotas que terminan en los próximos 3 meses (inclusive el mes actual)
+        const pronto = cuotas
+          .filter((c) => c.activa)
+          .map((c) => {
+            const endPeriod = c.anio_inicio * 12 + c.mes_inicio + c.total_cuotas - 1;
+            const remaining = endPeriod - currentPeriod + 1;
+            return { ...c, remaining };
+          })
+          .filter((c) => c.remaining >= 1 && c.remaining <= 3)
+          .sort((a, b) => a.remaining - b.remaining);
+        setCuotasPronto(pronto);
+      })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
   }, [anio, mes]);
@@ -273,6 +291,50 @@ export default function Dashboard() {
               </div>
             </Card>
           </div>
+
+          {/* Widget: cuotas que terminan pronto */}
+          {cuotasPronto.length > 0 && (
+            <Card>
+              <p className="dashboard__section-title">
+                <span style={{ display: "inline-flex", alignItems: "center", gap: "var(--space-2)" }}>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--warning)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                  </svg>
+                  Cuotas por terminar
+                </span>
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+                {cuotasPronto.map((c) => {
+                  const totalM   = c.mes_inicio + c.total_cuotas - 1;
+                  const endYear  = c.anio_inicio + Math.floor((totalM - 1) / 12);
+                  const endMonth = ((totalM - 1) % 12) + 1;
+                  const label = c.remaining === 1
+                    ? "Último pago este mes"
+                    : c.remaining === 2
+                    ? "Termina el mes que viene"
+                    : `Termina en ${MONTHS[endMonth - 1]} ${endYear}`;
+                  return (
+                    <div key={c.id} style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", padding: "var(--space-3)", background: "var(--bg-elevated)", borderRadius: "var(--radius)", border: "1px solid var(--border)" }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontWeight: "var(--font-medium)", color: "var(--text-primary)", fontSize: "var(--text-sm)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nombre}</div>
+                        <div style={{ fontSize: "var(--text-xs)", color: "var(--warning)", marginTop: 2 }}>{label}</div>
+                      </div>
+                      <div style={{ textAlign: "right", flexShrink: 0 }}>
+                        <div style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-semibold)", color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>
+                          {c.moneda === "USD"
+                            ? `U$D ${c.monto_cuota.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+                            : fmt(c.monto_cuota)}
+                        </div>
+                        <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+                          {c.remaining === 1 ? "1 cuota" : `${c.remaining} cuotas`} restante{c.remaining !== 1 ? "s" : ""}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </Card>
+          )}
 
           {/* Desglose por categoría */}
           <Card>
