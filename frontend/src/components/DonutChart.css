@@ -1,0 +1,87 @@
+/* ============================================================
+   DONUT CHART — SVG puro, Gestor Gastos
+   ============================================================ */
+
+.donut-chart {
+  display: flex;
+  align-items: center;
+  gap: var(--space-8);
+}
+
+.donut-chart__svg-wrapper {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.donut-chart__center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.donut-chart__center-value {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.donut-chart__center-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: var(--space-1);
+}
+
+/* --- Leyenda --- */
+.donut-chart__legend {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  flex: 1;
+  min-width: 0;
+}
+
+.donut-chart__legend-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.donut-chart__legend-dot {
+  width: 8px;
+  height: 8px;
+  min-width: 8px;
+  border-radius: var(--radius-full);
+}
+
+.donut-chart__legend-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.donut-chart__legend-name {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.donut-chart__legend-value {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Animación de entrada */
+.donut-chart__segment {
+  transition: stroke-dashoffset 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}

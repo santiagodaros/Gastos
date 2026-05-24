@@ -1,0 +1,198 @@
+/* ============================================================
+   SIDEBAR — Gestor Gastos
+   ============================================================ */
+
+.sidebar {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: var(--sidebar-width);
+  min-width: var(--sidebar-width);
+  height: 100%;
+  background: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
+  transition: var(--sidebar-transition);
+  z-index: var(--z-sidebar);
+  overflow: hidden;
+}
+
+.sidebar.collapsed {
+  width: var(--sidebar-width-collapsed);
+  min-width: var(--sidebar-width-collapsed);
+}
+
+/* --- Brand --- */
+.sidebar__brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6) var(--space-4);
+  border-bottom: 1px solid var(--border-subtle);
+  min-height: 72px;
+  overflow: hidden;
+}
+
+.sidebar__brand-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  background: var(--accent-muted);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius);
+  color: var(--accent);
+}
+
+.sidebar__brand-text {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.sidebar__brand-title {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+  letter-spacing: 0.01em;
+}
+
+.sidebar__brand-subtitle {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+/* --- Nav --- */
+.sidebar__nav {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: var(--space-4) var(--space-3);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.sidebar__section-label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: var(--space-3) var(--space-3) var(--space-1);
+  white-space: nowrap;
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity var(--transition-base);
+}
+
+.sidebar.collapsed .sidebar__section-label {
+  opacity: 0;
+}
+
+.sidebar__item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  color: var(--text-secondary);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  white-space: nowrap;
+  overflow: hidden;
+  cursor: pointer;
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
+  user-select: none;
+}
+
+.sidebar__item:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.sidebar__item.active {
+  color: var(--accent);
+  background: var(--accent-muted);
+}
+
+.sidebar__item-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  color: inherit;
+}
+
+.sidebar__item-label {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 1;
+  transition: opacity var(--transition-base);
+}
+
+.sidebar.collapsed .sidebar__item-label {
+  opacity: 0;
+}
+
+/* --- Footer / Toggle --- */
+.sidebar__footer {
+  padding: var(--space-4) var(--space-3);
+  border-top: 1px solid var(--border-subtle);
+}
+
+.sidebar__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  gap: var(--space-3);
+  transition:
+    color var(--transition-fast),
+    background var(--transition-fast);
+}
+
+.sidebar__toggle:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.sidebar__toggle-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  min-width: 20px;
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar.collapsed .sidebar__toggle-icon {
+  transform: rotate(180deg);
+}
+
+.sidebar__toggle-label {
+  font-size: var(--text-xs);
+  font-weight: var(--font-medium);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+  opacity: 1;
+  transition: opacity var(--transition-base);
+}
+
+.sidebar.collapsed .sidebar__toggle-label {
+  opacity: 0;
+}
