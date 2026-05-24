@@ -40,7 +40,7 @@ const Spinner = () => (
 export default function App() {
   const { session, loading, mfaStatus } = useAuth();
 
-  if (loading || mfaStatus === "loading") return <Spinner />;
+  if (loading) return <Spinner />;
 
   // No hay sesión → login
   if (!session) return <Login />;

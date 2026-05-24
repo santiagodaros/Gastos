@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { supabase } from "./supabase";
 
-export type MfaStatus = "loading" | "unenrolled" | "needs-verify" | "verified";
+export type MfaStatus = "unenrolled" | "needs-verify" | "verified";
 
 interface AuthContextType {
   session: Session | null;
@@ -13,46 +13,44 @@ interface AuthContextType {
   signOut: () => Promise<void>;
   enrollTotp: () => Promise<{ factorId: string; qrCode: string; secret: string }>;
   verifyTotp: (factorId: string, code: string) => Promise<void>;
-  refreshMfaStatus: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-async function checkMfaStatus(): Promise<MfaStatus> {
-  const { data, error } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-  if (error || !data) return "unenrolled";
-  if (data.currentLevel === "aal2") return "verified";
-  if (data.nextLevel === "aal2") return "needs-verify";
-  return "unenrolled";
+async function resolveMfaStatus(): Promise<MfaStatus> {
+  try {
+    const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+    if (!data) return "unenrolled";
+    if (data.currentLevel === "aal2") return "verified";
+    if (data.nextLevel === "aal2") return "needs-verify";
+    return "unenrolled";
+  } catch {
+    return "unenrolled";
+  }
 }
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession]       = useState<Session | null>(null);
-  const [loading, setLoading]       = useState(true);
-  const [mfaStatus, setMfaStatus]   = useState<MfaStatus>("loading");
-
-  async function refreshMfaStatus() {
-    const status = await checkMfaStatus();
-    setMfaStatus(status);
-  }
+  const [session,   setSession]   = useState<Session | null>(null);
+  const [loading,   setLoading]   = useState(true);
+  const [mfaStatus, setMfaStatus] = useState<MfaStatus>("unenrolled");
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      if (session) {
-        const status = await checkMfaStatus();
-        setMfaStatus(status);
-      } else {
-        setMfaStatus("unenrolled");
-      }
-      setLoading(false);
-    });
+    supabase.auth.getSession()
+      .then(async ({ data: { session } }) => {
+        setSession(session);
+        if (session) {
+          const status = await resolveMfaStatus();
+          setMfaStatus(status);
+        }
+      })
+      .catch(() => { /* keep defaults */ })
+      .finally(() => setLoading(false));
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
         setSession(session);
         if (session) {
-          const status = await checkMfaStatus();
+          const status = await resolveMfaStatus();
           setMfaStatus(status);
         } else {
           setMfaStatus("unenrolled");
@@ -74,13 +72,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   async function enrollTotp() {
-    const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp", issuer: "Gastos", friendlyName: "Autenticador" });
+    const { data, error } = await supabase.auth.mfa.enroll({
+      factorType: "totp",
+      issuer: "Gastos",
+      friendlyName: "Autenticador",
+    });
     if (error || !data) throw new Error(error?.message ?? "Error al iniciar enrollment");
-    return {
-      factorId: data.id,
-      qrCode:   data.totp.qr_code,
-      secret:   data.totp.secret,
-    };
+    return { factorId: data.id, qrCode: data.totp.qr_code, secret: data.totp.secret };
   }
 
   async function verifyTotp(factorId: string, code: string) {
@@ -91,15 +89,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{
-      session,
-      user: session?.user ?? null,
-      loading,
-      mfaStatus,
-      signIn,
-      signOut,
-      enrollTotp,
-      verifyTotp,
-      refreshMfaStatus,
+      session, user: session?.user ?? null, loading, mfaStatus,
+      signIn, signOut, enrollTotp, verifyTotp,
     }}>
       {children}
     </AuthContext.Provider>
