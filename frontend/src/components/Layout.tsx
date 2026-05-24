@@ -3,12 +3,15 @@ import Sidebar, { type ViewId } from "./Sidebar";
 import "./Layout.css";
 
 const VIEW_TITLES: Record<ViewId, string> = {
-  dashboard: "Dashboard",
-  gastos:    "Gastos Mensuales",
-  fijos:     "Gastos Fijos",
-  cuotas:    "Cuotas",
-  sueldos:   "Sueldos",
-  metas:     "Metas de Ahorro",
+  dashboard:  "Dashboard",
+  gastos:     "Gastos Mensuales",
+  fijos:      "Gastos Fijos",
+  cuotas:     "Cuotas",
+  sueldos:    "Sueldos",
+  metas:      "Metas de Ahorro",
+  proyeccion: "Proyección",
+  historial:  "Historial",
+  categorias: "Categorías",
 };
 
 interface LayoutProps {
