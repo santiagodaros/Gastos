@@ -3,7 +3,17 @@
    Dark Professional · Vanilla CSS
    ============================================================ */
 
+/* Aliases semánticos usados por los componentes */
 :root {
+  --bg:            var(--bg-base);
+  --surface:       var(--bg-surface);
+  --surface-raised:var(--bg-elevated);
+  --text:          var(--text-primary);
+}
+
+/* ── TEMA OSCURO (default) ── */
+:root,
+[data-theme="dark"] {
   /* --- Backgrounds --- */
   --bg-base:     #07070f;   /* fondo raíz, casi negro azulado */
   --bg-surface:  #0e0e1a;   /* cards, panels */
@@ -97,4 +107,40 @@
   --z-overlay:  200;
   --z-modal:    300;
   --z-tooltip:  400;
+}
+
+/* ── TEMA CLARO ── */
+[data-theme="light"] {
+  --bg-base:     #f4f5f9;
+  --bg-surface:  #ffffff;
+  --bg-elevated: #eaecf4;
+  --bg-overlay:  #f0f1f8;
+
+  --border-subtle: #e2e4f0;
+  --border:        #d0d3e8;
+  --border-strong: #b8bcd8;
+
+  --accent:         #4c6ef5;
+  --accent-hover:   #3b5bdb;
+  --accent-muted:   rgba(76, 110, 245, 0.1);
+  --accent-glow:    rgba(76, 110, 245, 0.2);
+
+  --positive:       #12b76a;
+  --positive-muted: rgba(18, 183, 106, 0.1);
+  --negative:       #f04438;
+  --negative-muted: rgba(240, 68, 56, 0.1);
+  --warning:        #f59e0b;
+  --warning-muted:  rgba(245, 158, 11, 0.1);
+  --neutral:        #667085;
+  --neutral-muted:  rgba(102, 112, 133, 0.1);
+
+  --text-primary:   #1a1a2e;
+  --text-secondary: #4a4a6a;
+  --text-muted:     #9090b0;
+  --text-on-accent: #ffffff;
+
+  --shadow-sm:  0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow:     0 4px 16px rgba(0, 0, 0, 0.1);
+  --shadow-lg:  0 8px 32px rgba(0, 0, 0, 0.14);
+  --shadow-glow: 0 0 20px var(--accent-glow);
 }
