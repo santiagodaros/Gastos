@@ -11,8 +11,8 @@ const VIEW_TITLES: Record<ViewId, string> = {
   cuotas:     "Cuotas",
   sueldos:    "Sueldos",
   metas:      "Metas de Ahorro",
-  historial:  "Historial",
-  categorias: "Categorías",
+  historial:     "Historial",
+  configuracion: "Configuración",
 };
 
 interface LayoutProps {
