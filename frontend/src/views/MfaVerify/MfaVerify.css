@@ -1,0 +1,109 @@
+.mfa-verify {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: 1rem;
+}
+
+.mfa-verify__card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 2.5rem 2rem;
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  text-align: center;
+}
+
+.mfa-verify__icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.mfa-verify__title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--text);
+  margin: 0;
+}
+
+.mfa-verify__subtitle {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.mfa-verify__loading {
+  padding: 1rem 0;
+}
+
+.mfa-verify__code-input {
+  text-align: center;
+  font-size: 2rem;
+  letter-spacing: 0.4em;
+  font-family: monospace;
+  font-weight: 600;
+}
+
+.mfa-verify__btn {
+  width: 100%;
+  padding: 0.75rem;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+
+.mfa-verify__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.mfa-verify__btn:not(:disabled):hover {
+  opacity: 0.9;
+}
+
+.mfa-verify__error {
+  width: 100%;
+  background: #fee2e2;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  padding: 0.75rem;
+  font-size: 0.85rem;
+  color: #dc2626;
+  text-align: left;
+}
+
+.mfa-verify__signout {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.mfa-verify__signout:hover {
+  color: var(--text);
+}
+
+.form {
+  width: 100%;
+}
