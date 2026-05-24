@@ -17,7 +17,8 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-async function resolveMfaStatus(): Promise<MfaStatus> {
+/** Lee el AAL del token local — no hace red, no puede colgar */
+async function getMfaStatusFromToken(): Promise<MfaStatus> {
   try {
     const { data } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
     if (!data) return "unenrolled";
@@ -35,35 +36,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [mfaStatus, setMfaStatus] = useState<MfaStatus>("unenrolled");
 
   useEffect(() => {
-    supabase.auth.getSession()
-      .then(async ({ data: { session } }) => {
-        setSession(session);
-        if (session) {
-          const status = await resolveMfaStatus();
-          setMfaStatus(status);
-        }
-      })
-      .catch(() => { /* keep defaults */ })
-      .finally(() => setLoading(false));
+    // Timeout de seguridad: si getSession() cuelga, desbloqueamos igual
+    const safetyTimer = setTimeout(() => setLoading(false), 5000);
+
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
+      clearTimeout(safetyTimer);
+      setSession(session);
+      if (session) {
+        // Sesión existente: verificar MFA desde el JWT (operación local)
+        const status = await getMfaStatusFromToken();
+        setMfaStatus(status);
+      }
+      setLoading(false);
+    }).catch(() => {
+      clearTimeout(safetyTimer);
+      setLoading(false);
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
+      (_event, session) => {
         setSession(session);
-        if (session) {
-          const status = await resolveMfaStatus();
-          setMfaStatus(status);
-        } else {
-          setMfaStatus("unenrolled");
-        }
+        if (!session) setMfaStatus("unenrolled");
       }
     );
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(safetyTimer);
+      subscription.unsubscribe();
+    };
   }, []);
 
   async function signIn(email: string, password: string) {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) throw new Error(error.message);
+    // Chequear MFA justo después del login exitoso
+    const status = await getMfaStatusFromToken();
+    setMfaStatus(status);
   }
 
   async function signOut() {
