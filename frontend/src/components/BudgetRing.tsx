@@ -27,6 +27,14 @@ export default function BudgetRing({ used, budget, fmt, size = 200 }: BudgetRing
   const offset = C * (1 - (animated ? clamped : 0));
   const color = over ? "var(--negative)" : pct >= 0.85 ? "var(--warning)" : "var(--positive)";
 
+  // El monto del centro se achica según su largo para no tocar el anillo.
+  const inner = size - stroke * 2 - 12;
+  const remStr = fmt(Math.abs(remaining));
+  const heroFont =
+    remStr.length >= 13 ? "1.3rem" :
+    remStr.length >= 11 ? "1.55rem" :
+    remStr.length >= 9  ? "1.75rem" : "1.95rem";
+
   return (
     <div style={{ position: "relative", width: size, height: size, flexShrink: 0 }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ transform: "rotate(-90deg)" }}>
@@ -40,14 +48,15 @@ export default function BudgetRing({ used, budget, fmt, size = 200 }: BudgetRing
       </svg>
       <div style={{
         position: "absolute", inset: 0, display: "flex", flexDirection: "column",
-        alignItems: "center", justifyContent: "center", textAlign: "center", padding: "0 12px",
+        alignItems: "center", justifyContent: "center", textAlign: "center",
       }}>
         <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>
           {over ? "Te excediste" : "Te queda"}
         </span>
         <span style={{
-          fontSize: "1.9rem", fontWeight: "var(--font-bold)", letterSpacing: "-0.03em", lineHeight: 1.05,
+          fontSize: heroFont, fontWeight: "var(--font-bold)", letterSpacing: "-0.03em", lineHeight: 1.05,
           color: over ? "var(--negative)" : "var(--text-primary)",
+          maxWidth: inner, whiteSpace: "nowrap",
         }}>
           <CountUp value={Math.abs(remaining)} format={fmt} />
         </span>
