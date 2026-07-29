@@ -84,6 +84,10 @@ const HELP = `<b>Carga rápida — comandos</b>
 <code>cuota heladera 15000 12</code>
 (nombre, monto por cuota, total de cuotas)
 
+📎 <b>Transferencia</b>
+Mandá la foto o PDF del comprobante con el monto en el epígrafe:
+<code>50000 alquiler</code>
+
 Formatos de monto: <code>8000</code>, <code>8.000</code>, <code>12k</code>, <code>12500,50</code>`;
 
 // ── Handlers de datos ─────────────────────────────────────────
@@ -193,6 +197,67 @@ async function handleCuota(tokens: string[], chatId: number) {
   await sendMessage(chatId, `✅ <b>Cuota</b> ${nombre} · ${montoFmt} × ${total} · desde ${MONTHS[mes-1]} ${anio}`);
 }
 
+// ── Comprobantes de transferencia (foto/PDF) ──────────────────
+
+// Descarga el archivo de Telegram y lo sube al bucket privado 'comprobantes'.
+async function uploadComprobante(fileId: string, mime?: string): Promise<string | null> {
+  const info = await fetch(`https://api.telegram.org/bot${BOT_TOKEN}/getFile?file_id=${fileId}`).then((r) => r.json());
+  const filePath: string | undefined = info?.result?.file_path;
+  if (!filePath) return null;
+  const bytes = new Uint8Array(await fetch(`https://api.telegram.org/file/bot${BOT_TOKEN}/${filePath}`).then((r) => r.arrayBuffer()));
+  const ext = (filePath.split(".").pop() || "jpg").toLowerCase();
+  const contentType = mime || (ext === "pdf" ? "application/pdf" : "image/jpeg");
+  const path = `${APP_USER_ID}/${Date.now()}.${ext}`;
+  const { error } = await db.storage.from("comprobantes").upload(path, bytes, { contentType, upsert: false });
+  if (error) return null;
+  return path;
+}
+
+async function handleComprobante(msg: any, chatId: number) {
+  const { mes, anio } = nowAR();
+  const caption = (msg.caption ?? "").trim();
+  if (!caption) {
+    await sendMessage(chatId, "📎 Recibí el comprobante. Reenvialo con el monto en el epígrafe, ej: <code>50000 alquiler</code>");
+    return;
+  }
+
+  // Parseo del epígrafe (igual que un gasto): monto + categoría + detalle.
+  const tokens: string[] = caption.split(/\s+/);
+  let monto: number | null = null;
+  const words: string[] = [];
+  for (const t of tokens) {
+    if (monto === null && isNumeric(t)) monto = parseMonto(t);
+    else words.push(t);
+  }
+  if (monto === null || monto <= 0) {
+    await sendMessage(chatId, "⚠️ No encontré el monto en el epígrafe. Ej: <code>50000 alquiler</code>");
+    return;
+  }
+
+  const cats = await loadCategorias();
+  let categoria = "Otros";
+  let catIdx = -1;
+  for (let i = 0; i < words.length; i++) {
+    const hit = cats.find((c) => c.n === norm(words[i]));
+    if (hit) { categoria = hit.nombre; catIdx = i; break; }
+  }
+  const detalle = words.filter((_, i) => i !== catIdx).join(" ").trim();
+  const nombre = detalle || categoria;
+
+  // Subir el comprobante (si falla, igual cargamos el gasto).
+  const fileId: string | undefined = msg.photo?.[msg.photo.length - 1]?.file_id ?? msg.document?.file_id;
+  const comprobante = fileId ? await uploadComprobante(fileId, msg.document?.mime_type) : null;
+
+  const { error } = await db.from("gastos_mensuales").insert({
+    user_id: APP_USER_ID, mes, anio, nombre, monto, categoria, moneda: "ARS",
+    fecha: todayAR(), medio: "transferencia", comprobante_url: comprobante,
+  });
+  if (error) { await sendMessage(chatId, `❌ Error: ${error.message}`); return; }
+
+  const montoFmt = monto.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
+  await sendMessage(chatId, `✅ <b>Transferencia</b> ${montoFmt} · ${categoria} · ${nombre} · ${MONTHS[mes - 1]} ${anio}${comprobante ? " · 📎 comprobante guardado" : ""}`);
+}
+
 // ── Entry point ───────────────────────────────────────────────
 
 Deno.serve(async (req) => {
@@ -207,10 +272,12 @@ Deno.serve(async (req) => {
 
   const msg = update?.message ?? update?.edited_message;
   const chatId: number | undefined = msg?.chat?.id;
-  const text: string = (msg?.text ?? "").trim();
-  if (!chatId || !text) return new Response("ok");
+  if (!chatId) return new Response("ok");
 
-  const first = norm(text.split(/\s+/)[0]);
+  const text: string = (msg?.text ?? "").trim();
+  const photo = msg?.photo?.[msg.photo.length - 1];
+  const doc = msg?.document;
+  const first = text ? norm(text.split(/\s+/)[0]) : "";
 
   // /id y /start funcionan siempre (ayudan al setup, no escriben datos)
   if (first === "/id") {
@@ -229,14 +296,17 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const tokens = text.split(/\s+/);
-    if (first === "ingreso" || first === "ingresos") {
-      await handleIngreso(tokens.slice(1), chatId);
+    if (photo || doc) {
+      // Comprobante de transferencia (foto o PDF) con el monto en el epígrafe.
+      await handleComprobante(msg, chatId);
+    } else if (!text) {
+      return new Response("ok");
+    } else if (first === "ingreso" || first === "ingresos") {
+      await handleIngreso(text.split(/\s+/).slice(1), chatId);
     } else if (first === "cuota") {
-      await handleCuota(tokens.slice(1), chatId);
+      await handleCuota(text.split(/\s+/).slice(1), chatId);
     } else {
-      // por defecto: gasto
-      await handleGasto(tokens, chatId);
+      await handleGasto(text.split(/\s+/), chatId);
     }
   } catch (e) {
     await sendMessage(chatId, `❌ Error inesperado: ${(e as Error).message}`);

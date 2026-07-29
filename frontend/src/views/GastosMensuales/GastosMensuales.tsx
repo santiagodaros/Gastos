@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { gastosApi, categoriasApi, tarjetasApi, type GastoMensual, type GastoMensualCreate, type Categoria, type Tarjeta } from "../../api_client";
+import { gastosApi, categoriasApi, tarjetasApi, comprobantesApi, type GastoMensual, type GastoMensualCreate, type Categoria, type Tarjeta } from "../../api_client";
 import { getCotizacionDolar } from "../../lib/finance";
 import { Card } from "../../components/Card";
 import { Modal, ConfirmModal } from "../../components/Modal";
@@ -114,6 +114,12 @@ export default function GastosMensuales() {
     }
   }
 
+  async function verComprobante(path: string) {
+    const url = await comprobantesApi.signedUrl(path);
+    if (url) window.open(url, "_blank");
+    else alert("No pude abrir el comprobante.");
+  }
+
   async function handleDelete() {
     if (!toDelete) return;
     setDeleting(true);
@@ -200,6 +206,16 @@ export default function GastosMensuales() {
                       const t = tarjetas.find((x) => x.id === item.tarjeta_id);
                       return t ? <span className="badge badge--accent" style={{ marginLeft: 6, fontSize: "var(--text-xs)" }}>{t.nombre}</span> : null;
                     })()}
+                    {item.medio === "transferencia" && (
+                      <span className="badge badge--neutral" style={{ marginLeft: 6, fontSize: "var(--text-xs)" }}>Transferencia</span>
+                    )}
+                    {item.comprobante_url && (
+                      <button
+                        onClick={() => verComprobante(item.comprobante_url!)}
+                        title="Ver comprobante"
+                        style={{ marginLeft: 6, background: "none", border: "none", cursor: "pointer", fontSize: "var(--text-sm)" }}
+                      >📎</button>
+                    )}
                     {item.nota && <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 }}>{item.nota}</div>}
                   </td>
                   <td>

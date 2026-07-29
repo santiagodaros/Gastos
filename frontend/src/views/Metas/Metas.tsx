@@ -26,6 +26,16 @@ function proyectar(acumulado: number, tna: number, meses: number) {
   return { proyectado, rendimiento: proyectado - acumulado };
 }
 
+// Proyección de una inversión: capital que compone + aportes mensuales (anualidad).
+function proyectarInversion(acumulado: number, tna: number, meses: number, aporte: number) {
+  const r = tna > 0 ? Math.pow(1 + tna / 100, 1 / 12) - 1 : 0;
+  const fvCapital = r > 0 ? acumulado * Math.pow(1 + r, meses) : acumulado;
+  const fvAportes = r > 0 ? aporte * ((Math.pow(1 + r, meses) - 1) / r) : aporte * meses;
+  const proyectado = fvCapital + fvAportes;
+  const aportado = acumulado + aporte * meses;
+  return { proyectado, aportado, rendimiento: proyectado - aportado };
+}
+
 const EMPTY_FORM: MetaAhorroCreate = {
   nombre: "",
   objetivo: 0,
@@ -34,6 +44,8 @@ const EMPTY_FORM: MetaAhorroCreate = {
   prioridad: 2,
   activa: 1,
   tasa_rendimiento: 0,
+  tipo: "meta",
+  aporte_mensual: 0,
 };
 
 export default function Metas() {
@@ -72,6 +84,8 @@ export default function Metas() {
       prioridad: item.prioridad,
       activa: item.activa,
       tasa_rendimiento: item.tasa_rendimiento ?? 0,
+      tipo: item.tipo ?? "meta",
+      aporte_mensual: item.aporte_mensual ?? 0,
     });
     setEditItem(item);
     setModal("edit");
@@ -164,6 +178,72 @@ export default function Metas() {
           {items.map((item) => {
             const tna    = item.tasa_rendimiento ?? 0;
             const meses  = mesesHasta(item.fecha_limite);
+
+            // ── Card de INVERSIÓN (sin objetivo, con horizonte) ──
+            if (item.tipo === "inversion") {
+              const inv = proyectarInversion(item.acumulado, tna, meses, item.aporte_mensual ?? 0);
+              const horizonteLabel = item.fecha_limite
+                ? `al ${new Date(item.fecha_limite).toLocaleDateString("es-AR", { month: "short", year: "numeric" })}`
+                : "en 12 meses";
+              return (
+                <Card key={item.id}>
+                  <div className="meta-card">
+                    <div className="meta-card__header">
+                      <span className="meta-card__nombre" style={{ opacity: item.activa ? 1 : 0.5 }}>{item.nombre}</span>
+                      <div style={{ display: "flex", gap: "var(--space-1)", alignItems: "center" }}>
+                        <span className="badge badge--accent">Inversión</span>
+                        {!item.activa && <span className="badge badge--neutral">Inactiva</span>}
+                      </div>
+                    </div>
+
+                    <div className="meta-card__amounts">
+                      <div>
+                        <div className="meta-card__amount-label">Acumulado</div>
+                        <div className="meta-card__amount" style={{ color: "var(--positive)" }}>{fmt(item.acumulado)}</div>
+                      </div>
+                      <div style={{ textAlign: "right" }}>
+                        <div className="meta-card__amount-label">Aporte mensual</div>
+                        <div className="meta-card__amount">{item.aporte_mensual ? fmt(item.aporte_mensual) : "—"}</div>
+                      </div>
+                    </div>
+
+                    <div style={{ background: "var(--bg-elevated)", borderRadius: "var(--radius)", padding: "var(--space-3)", border: "1px solid var(--border)" }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "var(--space-2)" }}>
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>{tna > 0 ? `${tna}% TNA` : "sin rendimiento"}</span>
+                        <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Horizonte {horizonteLabel}</span>
+                      </div>
+                      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
+                        <div>
+                          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 2 }}>Rend. estimado</div>
+                          <div style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-semibold)", color: "var(--positive)", fontVariantNumeric: "tabular-nums" }}>+{fmt(inv.rendimiento)}</div>
+                        </div>
+                        <div style={{ textAlign: "right" }}>
+                          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginBottom: 2 }}>Valor proyectado</div>
+                          <div style={{ fontSize: "var(--text-base)", fontWeight: "var(--font-bold)", color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>{fmt(inv.proyectado)}</div>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="meta-card__actions">
+                      <button className="btn-ghost" style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-3)" }} onClick={() => openDepositar(item)}>+ Aportar</button>
+                      <div style={{ display: "flex", gap: "var(--space-1)" }}>
+                        <button className="row-action-btn" onClick={() => openEdit(item)} title="Editar">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                          </svg>
+                        </button>
+                        <button className="row-action-btn danger" onClick={() => setToDelete(item)} title="Eliminar">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6" /><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+                          </svg>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </Card>
+              );
+            }
+
             const { proyectado, rendimiento } = proyectar(item.acumulado, tna, meses);
 
             const pct          = item.objetivo > 0 ? Math.min(100, (item.acumulado / item.objetivo) * 100) : 0;
@@ -327,19 +407,32 @@ export default function Metas() {
                 autoFocus
               />
             </div>
+            <div className="form__field">
+              <label className="form__label">Tipo</label>
+              <select
+                className="form__select"
+                value={form.tipo}
+                onChange={(e) => setForm({ ...form, tipo: e.target.value })}
+              >
+                <option value="meta">Meta con objetivo</option>
+                <option value="inversion">Inversión (abierta, con horizonte)</option>
+              </select>
+            </div>
             <div className="form__row">
-              <div className="form__field">
-                <label className="form__label">Objetivo</label>
-                <input
-                  className="form__input"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={form.objetivo || ""}
-                  onChange={(e) => setForm({ ...form, objetivo: parseFloat(e.target.value) || 0 })}
-                  required
-                />
-              </div>
+              {form.tipo === "meta" && (
+                <div className="form__field">
+                  <label className="form__label">Objetivo</label>
+                  <input
+                    className="form__input"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.objetivo || ""}
+                    onChange={(e) => setForm({ ...form, objetivo: parseFloat(e.target.value) || 0 })}
+                    required
+                  />
+                </div>
+              )}
               <div className="form__field">
                 <label className="form__label">Acumulado</label>
                 <input
@@ -351,6 +444,20 @@ export default function Metas() {
                   onChange={(e) => setForm({ ...form, acumulado: parseFloat(e.target.value) || 0 })}
                 />
               </div>
+              {form.tipo === "inversion" && (
+                <div className="form__field">
+                  <label className="form__label">Aporte mensual</label>
+                  <input
+                    className="form__input"
+                    type="number"
+                    min={0}
+                    step="0.01"
+                    value={form.aporte_mensual || ""}
+                    onChange={(e) => setForm({ ...form, aporte_mensual: parseFloat(e.target.value) || 0 })}
+                    placeholder="0"
+                  />
+                </div>
+              )}
             </div>
             <div className="form__row">
               <div className="form__field">
@@ -379,7 +486,7 @@ export default function Metas() {
             </div>
             <div className="form__row">
               <div className="form__field">
-                <label className="form__label">Fecha límite <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(opcional)</span></label>
+                <label className="form__label">{form.tipo === "inversion" ? "Horizonte" : "Fecha límite"} <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(opcional)</span></label>
                 <input
                   className="form__input"
                   type="date"
@@ -417,7 +524,7 @@ export default function Metas() {
           <form className="form" onSubmit={handleDepositar}>
             <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", marginBottom: "var(--space-2)" }}>
               Acumulado actual: <strong style={{ color: "var(--positive)" }}>{fmt(editItem.acumulado)}</strong>
-              {" / "}{fmt(editItem.objetivo)}
+              {editItem.objetivo > 0 && <>{" / "}{fmt(editItem.objetivo)}</>}
             </div>
             <div className="form__field">
               <label className="form__label">Monto a depositar</label>

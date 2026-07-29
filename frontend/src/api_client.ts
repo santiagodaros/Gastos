@@ -47,6 +47,8 @@ export interface GastoMensual {
   fecha?: string | null;       // día del gasto (YYYY-MM-DD)
   tarjeta_id?: number | null;  // tarjeta/medio con que se pagó
   verificado?: boolean;        // conciliado contra el resumen
+  medio?: string | null;       // ej: 'transferencia'
+  comprobante_url?: string | null; // ruta del comprobante en Storage
 }
 export type GastoMensualCreate = Omit<GastoMensual, "id">;
 
@@ -107,6 +109,8 @@ export interface MetaAhorro {
   prioridad: number;
   activa: number;
   tasa_rendimiento: number;
+  tipo: string;              // 'meta' | 'inversion'
+  aporte_mensual: number;    // aporte mensual estimado (para inversiones)
 }
 export type MetaAhorroCreate = Omit<MetaAhorro, "id">;
 
@@ -208,7 +212,16 @@ export const resumenApi = {
 
 // ─── Gastos Mensuales ─────────────────────────────────────────────────────────
 
-const GASTO_COLS = "id, mes, anio, nombre, monto, categoria, moneda, nota, fecha, tarjeta_id, verificado";
+const GASTO_COLS = "id, mes, anio, nombre, monto, categoria, moneda, nota, fecha, tarjeta_id, verificado, medio, comprobante_url";
+
+// Genera una URL firmada temporal para ver un comprobante guardado en Storage.
+export const comprobantesApi = {
+  signedUrl: async (path: string): Promise<string | null> => {
+    const { data, error } = await supabase.storage.from("comprobantes").createSignedUrl(path, 120);
+    if (error) return null;
+    return data?.signedUrl ?? null;
+  },
+};
 
 export const gastosApi = {
   list: async (anio: number, mes: number): Promise<GastoMensual[]> => {
@@ -429,7 +442,7 @@ export const cuotasApi = {
 
 // ─── Metas de Ahorro ──────────────────────────────────────────────────────────
 
-const META_COLS = "id, nombre, objetivo, acumulado, fecha_limite, prioridad, activa, tasa_rendimiento";
+const META_COLS = "id, nombre, objetivo, acumulado, fecha_limite, prioridad, activa, tasa_rendimiento, tipo, aporte_mensual";
 
 export const metasApi = {
   list: async (): Promise<MetaAhorro[]> => {
