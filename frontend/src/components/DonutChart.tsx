@@ -76,7 +76,7 @@ export default function DonutChart({
     <div className="donut-chart">
       {/* SVG */}
       <div className="donut-chart__svg-wrapper" style={{ width: size, height: size }}>
-        <svg ref={svgRef} width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+        <svg ref={svgRef} width={size} height={size} viewBox={`0 0 ${size} ${size}`} style={{ overflow: "visible" }}>
           {/* Track */}
           <circle cx={cx} cy={cy} r={radius} fill="none" stroke="var(--bg-elevated)" strokeWidth={thickness} />
 
