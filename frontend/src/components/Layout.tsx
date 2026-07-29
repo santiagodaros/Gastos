@@ -2,6 +2,7 @@ import { useState } from "react";
 import Sidebar, { type ViewId } from "./Sidebar";
 import BottomNav from "./BottomNav";
 import QuickAdd from "./QuickAdd";
+import NotificationBell from "./NotificationBell";
 import { useTheme } from "../lib/theme";
 import { useAuth } from "../lib/auth";
 import { NavContext } from "../lib/nav";
@@ -79,6 +80,7 @@ export default function Layout({ children }: LayoutProps) {
           </button>
 
           <span className="layout__topbar-title">{VIEW_TITLES[activeView]}</span>
+          <NotificationBell onChanged={() => setRefreshKey((k) => k + 1)} />
           <span className="layout__topbar-meta">{dateStr}</span>
         </header>
 

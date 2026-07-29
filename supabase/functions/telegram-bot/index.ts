@@ -69,6 +69,16 @@ async function sendMessage(chatId: number | string, text: string) {
   });
 }
 
+// Crea una notificación para la campanita de la app.
+async function notificar(titulo: string, detalle: string | null, refTabla: string | null, refId: number | null) {
+  await db.from("notificaciones").insert({
+    user_id: APP_USER_ID, titulo, detalle, ref_tabla: refTabla, ref_id: refId,
+  });
+}
+
+const fmtArs = (n: number) =>
+  n.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
+
 const HELP = `<b>Carga rápida — comandos</b>
 
 💸 <b>Gasto</b>
@@ -124,12 +134,13 @@ async function handleGasto(tokens: string[], chatId: number) {
   const detalle = words.filter((_, i) => i !== catWordIdx).join(" ").trim();
   const nombre = detalle || categoria;
 
-  const { error } = await db.from("gastos_mensuales").insert({
+  const { data, error } = await db.from("gastos_mensuales").insert({
     user_id: APP_USER_ID, mes, anio, nombre, monto, categoria, moneda: "ARS", fecha: todayAR(),
-  });
+  }).select("id").single();
   if (error) { await sendMessage(chatId, `❌ Error: ${error.message}`); return; }
 
-  const montoFmt = monto.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
+  const montoFmt = fmtArs(monto);
+  await notificar("Gasto por Telegram", `${nombre} · ${montoFmt} · ${categoria}`, "gastos_mensuales", data?.id ?? null);
   await sendMessage(chatId, `✅ <b>Gasto</b> ${montoFmt} · ${categoria} · ${nombre} · ${MONTHS[mes-1]} ${anio}`);
 }
 
@@ -159,10 +170,11 @@ async function handleIngreso(tokens: string[], chatId: number) {
     otros: existing?.otros ?? 0,
     [campo]: monto,
   };
-  const { error } = await db.from("ingresos").upsert(row, { onConflict: "user_id,mes,anio" });
+  const { data, error } = await db.from("ingresos").upsert(row, { onConflict: "user_id,mes,anio" }).select("id").single();
   if (error) { await sendMessage(chatId, `❌ Error: ${error.message}`); return; }
 
-  const montoFmt = monto.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
+  const montoFmt = fmtArs(monto);
+  await notificar("Ingreso por Telegram", `${campo} · ${montoFmt}`, "ingresos", data?.id ?? null);
   await sendMessage(chatId, `✅ <b>Ingreso</b> (${campo}) ${montoFmt} · ${MONTHS[mes-1]} ${anio}`);
 }
 
@@ -187,14 +199,15 @@ async function handleCuota(tokens: string[], chatId: number) {
   if (!nombre) { await sendMessage(chatId, "⚠️ Falta el nombre. Ej: <code>cuota heladera 15000 12</code>"); return; }
   if (monto <= 0 || total <= 0) { await sendMessage(chatId, "⚠️ Monto y total deben ser > 0."); return; }
 
-  const { error } = await db.from("cuotas").insert({
+  const { data, error } = await db.from("cuotas").insert({
     user_id: APP_USER_ID, nombre, monto_cuota: monto, cuota_actual: 1, total_cuotas: total,
     mes_inicio: mes, anio_inicio: anio, activa: 1, moneda: "ARS",
     categoria: "Sin categoría", tarjeta_id: null,
-  });
+  }).select("id").single();
   if (error) { await sendMessage(chatId, `❌ Error: ${error.message}`); return; }
 
-  const montoFmt = monto.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
+  const montoFmt = fmtArs(monto);
+  await notificar("Cuota por Telegram", `${nombre} · ${montoFmt} × ${total}`, "cuotas", data?.id ?? null);
   await sendMessage(chatId, `✅ <b>Cuota</b> ${nombre} · ${montoFmt} × ${total} · desde ${MONTHS[mes-1]} ${anio}`);
 }
 
@@ -256,14 +269,15 @@ async function handleComprobante(msg: any, chatId: number) {
   const fileId: string | undefined = msg.photo?.[msg.photo.length - 1]?.file_id ?? msg.document?.file_id;
   const comprobante = fileId ? await uploadComprobante(fileId, msg.document?.mime_type) : null;
 
-  const { error } = await db.from("gastos_mensuales").insert({
+  const { data, error } = await db.from("gastos_mensuales").insert({
     user_id: APP_USER_ID, mes, anio, nombre, monto, categoria, moneda: "ARS",
     fecha: todayAR(), medio, comprobante_url: comprobante,
-  });
+  }).select("id").single();
   if (error) { await sendMessage(chatId, `❌ Error: ${error.message}`); return; }
 
-  const montoFmt = monto.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
+  const montoFmt = fmtArs(monto);
   const tipoLabel = medio === "transferencia" ? "Transferencia" : "Gasto";
+  await notificar(`${tipoLabel} por Telegram`, `${nombre} · ${montoFmt} · ${categoria}${comprobante ? " · 📎" : ""}`, "gastos_mensuales", data?.id ?? null);
   await sendMessage(chatId, `✅ <b>${tipoLabel}</b> ${montoFmt} · ${categoria} · ${nombre} · ${MONTHS[mes - 1]} ${anio}${comprobante ? " · 📎 comprobante guardado" : ""}`);
 }
 

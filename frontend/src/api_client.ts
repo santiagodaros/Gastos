@@ -678,6 +678,51 @@ export const presupuestoApi = {
   },
 };
 
+// ─── Notificaciones (campanita) ───────────────────────────────────────────────
+
+export interface Notificacion {
+  id: number;
+  titulo: string;
+  detalle: string | null;
+  ref_tabla: string | null;
+  ref_id: number | null;
+  leida: boolean;
+  created_at: string;
+}
+
+export const notificacionesApi = {
+  list: async (): Promise<Notificacion[]> => {
+    const { data, error } = await supabase
+      .from("notificaciones")
+      .select("id, titulo, detalle, ref_tabla, ref_id, leida, created_at")
+      .order("created_at", { ascending: false })
+      .limit(30);
+    if (error) return []; // tabla aún sin crear → no rompe la app
+    return (data ?? []) as Notificacion[];
+  },
+
+  marcarLeida: async (id: number) => {
+    await supabase.from("notificaciones").update({ leida: true }).eq("id", id);
+  },
+
+  marcarTodas: async () => {
+    await supabase.from("notificaciones").update({ leida: true }).eq("leida", false);
+  },
+
+  // "No / no fui yo": deshace la carga (borra el registro + su comprobante) y la notificación.
+  rechazar: async (n: Notificacion) => {
+    if ((n.ref_tabla === "gastos_mensuales" || n.ref_tabla === "cuotas") && n.ref_id) {
+      const { data } = await supabase
+        .from(n.ref_tabla).select("comprobante_url").eq("id", n.ref_id).maybeSingle();
+      if (data?.comprobante_url) {
+        await supabase.storage.from("comprobantes").remove([data.comprobante_url]);
+      }
+      await supabase.from(n.ref_tabla).delete().eq("id", n.ref_id);
+    }
+    await supabase.from("notificaciones").delete().eq("id", n.id);
+  },
+};
+
 // Ahorro depositado en metas durante un mes (usado como "ahorro usado" del presupuesto).
 export const ahorroMesApi = {
   get: async (anio: number, mes: number): Promise<number> => {
