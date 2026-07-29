@@ -7,6 +7,8 @@ import ImportResumen from "../../components/ImportResumen";
 import BudgetRing from "../../components/BudgetRing";
 import CountUp from "../../components/CountUp";
 import { Skeleton } from "../../components/Skeleton";
+import { useNav } from "../../lib/nav";
+import type { ViewId } from "../../components/Sidebar";
 import "../../styles/abm.css";
 import "./Dashboard.css";
 
@@ -25,7 +27,14 @@ function fmtShort(n: number) {
   return `$${n.toFixed(0)}`;
 }
 
+const BUCKET_TO_VIEW: Record<string, ViewId> = {
+  Fijos: "fijos",
+  Mensuales: "gastos",
+  Cuotas: "cuotas",
+};
+
 export default function Dashboard() {
+  const nav = useNav();
   const now = new Date();
   const [anio, setAnio] = useState(now.getFullYear());
   const [mes, setMes]   = useState(now.getMonth() + 1);
@@ -319,6 +328,10 @@ export default function Dashboard() {
                   centerLabel="gastos"
                   centerValue={fmtShort(resumen.total_gastos)}
                   formatValue={(v) => v.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 })}
+                  onSliceClick={(i) => {
+                    const view = BUCKET_TO_VIEW[donutSlices[i].label];
+                    if (view) nav(view);
+                  }}
                 />
               ) : (
                 <p style={{ color: "var(--text-muted)", fontSize: "var(--text-sm)" }}>

@@ -4,6 +4,7 @@ import BottomNav from "./BottomNav";
 import QuickAdd from "./QuickAdd";
 import { useTheme } from "../lib/theme";
 import { useAuth } from "../lib/auth";
+import { NavContext } from "../lib/nav";
 import "./Layout.css";
 
 const VIEW_TITLES: Record<ViewId, string> = {
@@ -44,6 +45,7 @@ export default function Layout({ children }: LayoutProps) {
   }
 
   return (
+    <NavContext.Provider value={handleNavigate}>
     <div className="layout">
       {/* Overlay backdrop — solo en mobile cuando el sidebar está abierto */}
       {mobileOpen && (
@@ -102,5 +104,6 @@ export default function Layout({ children }: LayoutProps) {
         />
       )}
     </div>
+    </NavContext.Provider>
   );
 }
