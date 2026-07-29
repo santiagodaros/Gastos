@@ -3,6 +3,7 @@ import Login from "./views/Login/Login";
 import MfaEnroll from "./views/MfaEnroll/MfaEnroll";
 import MfaVerify from "./views/MfaVerify/MfaVerify";
 import Layout from "./components/Layout";
+import BiometricGate from "./components/BiometricGate";
 import Dashboard from "./views/Dashboard/Dashboard";
 import GastosMensuales from "./views/GastosMensuales/GastosMensuales";
 import Fijos from "./views/Fijos/Fijos";
@@ -49,6 +50,10 @@ export default function App() {
   if (mfaStatus === "unenrolled")  return <MfaEnroll />;
   if (mfaStatus === "needs-verify") return <MfaVerify />;
 
-  // Sesión + MFA verificado → app
-  return <Layout>{(view) => renderView(view)}</Layout>;
+  // Sesión + MFA verificado → app (con candado biométrico opcional por delante)
+  return (
+    <BiometricGate>
+      <Layout>{(view) => renderView(view)}</Layout>
+    </BiometricGate>
+  );
 }

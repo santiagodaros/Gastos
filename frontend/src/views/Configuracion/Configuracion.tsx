@@ -8,6 +8,8 @@ import {
 import { Card } from "../../components/Card";
 import { Modal, ConfirmModal } from "../../components/Modal";
 import { useToast } from "../../components/Toast";
+import { biometric } from "../../lib/biometric";
+import { useAuth } from "../../lib/auth";
 import "../../styles/abm.css";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
@@ -24,7 +26,7 @@ const COLORS = [
 const EMPTY_TARJETA: TarjetaCreate = { nombre: "", tipo: "Crédito", ultimos_4: "", activa: 1 };
 const EMPTY_CAT: CategoriaCreate   = { nombre: "", color: "#6366f1" };
 
-type Tab = "tarjetas" | "categorias" | "presupuesto";
+type Tab = "tarjetas" | "categorias" | "presupuesto" | "seguridad";
 
 // ─── Helpers UI ───────────────────────────────────────────────────────────────
 
@@ -65,7 +67,34 @@ const TrashIcon = () => (
 
 export default function Configuracion() {
   const toast = useToast();
+  const { session } = useAuth();
   const [tab, setTab] = useState<Tab>("tarjetas");
+
+  // ── Seguridad (candado Face ID) ──
+  const [bioAvailable, setBioAvailable] = useState(false);
+  const [bioEnabled, setBioEnabled]     = useState(biometric.isEnabled());
+  const [bioBusy, setBioBusy]           = useState(false);
+
+  useEffect(() => { biometric.platformAvailable().then(setBioAvailable); }, []);
+
+  async function toggleBio() {
+    setBioBusy(true);
+    try {
+      if (bioEnabled) {
+        biometric.disable();
+        setBioEnabled(false);
+        toast.success("Candado desactivado");
+      } else {
+        await biometric.enable(session?.user?.email ?? "usuario");
+        setBioEnabled(true);
+        toast.success("Candado con Face ID activado");
+      }
+    } catch {
+      toast.error("No se pudo configurar Face ID");
+    } finally {
+      setBioBusy(false);
+    }
+  }
 
   // ── Tarjetas state ──
   const [tarjetas, setTarjetas]     = useState<Tarjeta[]>([]);
@@ -158,7 +187,49 @@ export default function Configuracion() {
         <TabBtn active={tab === "tarjetas"}    onClick={() => setTab("tarjetas")}>Tarjetas</TabBtn>
         <TabBtn active={tab === "categorias"}  onClick={() => setTab("categorias")}>Categorías</TabBtn>
         <TabBtn active={tab === "presupuesto"} onClick={() => setTab("presupuesto")}>Presupuesto</TabBtn>
+        <TabBtn active={tab === "seguridad"}   onClick={() => setTab("seguridad")}>Seguridad</TabBtn>
       </div>
+
+      {/* ── TAB: SEGURIDAD ── */}
+      {tab === "seguridad" && (
+        <Card>
+          <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)", maxWidth: 520 }}>
+            <div>
+              <h3 style={{ fontSize: "var(--text-base)", fontWeight: "var(--font-semibold)", color: "var(--text-primary)", marginBottom: 4 }}>
+                Candado con Face ID
+              </h3>
+              <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.6 }}>
+                Pide Face ID (o huella) cada vez que abrís la app, antes de mostrar tus datos.
+                Es un candado en este dispositivo — no cambia tu login ni tu clave.
+              </p>
+            </div>
+
+            {!bioAvailable ? (
+              <div style={{
+                padding: "var(--space-3) var(--space-4)", borderRadius: "var(--radius)",
+                background: "var(--bg-elevated)", border: "1px solid var(--border)",
+                fontSize: "var(--text-sm)", color: "var(--text-muted)",
+              }}>
+                Este dispositivo/navegador no ofrece Face ID o huella. Probá desde la app instalada
+                en tu celular (iPhone con iOS 16.4+ o Android con huella).
+              </div>
+            ) : (
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between", gap: "var(--space-4)",
+                padding: "var(--space-3) var(--space-4)", borderRadius: "var(--radius)",
+                background: "var(--bg-elevated)", border: `1px solid ${bioEnabled ? "var(--positive)" : "var(--border)"}`,
+              }}>
+                <span style={{ fontSize: "var(--text-sm)", color: "var(--text-primary)" }}>
+                  {bioEnabled ? "Candado activado ✓" : "Candado desactivado"}
+                </span>
+                <button className={bioEnabled ? "btn-danger" : "btn-primary"} onClick={toggleBio} disabled={bioBusy}>
+                  {bioBusy ? "..." : bioEnabled ? "Desactivar" : "Activar Face ID"}
+                </button>
+              </div>
+            )}
+          </div>
+        </Card>
+      )}
 
       {/* ── TAB: PRESUPUESTO ── */}
       {tab === "presupuesto" && (

@@ -1,0 +1,61 @@
+.biolock {
+  position: fixed;
+  inset: 0;
+  z-index: 999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+  padding-top: calc(var(--space-6) + env(safe-area-inset-top));
+  background: var(--bg-base);
+}
+
+.biolock__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--space-3);
+  max-width: 340px;
+  width: 100%;
+}
+
+.biolock__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 68px;
+  height: 68px;
+  border-radius: var(--radius-full);
+  background: var(--accent-muted);
+  color: var(--accent);
+  margin-bottom: var(--space-2);
+}
+
+.biolock__title {
+  font-size: var(--text-xl);
+  font-weight: var(--font-bold);
+  color: var(--text-primary);
+  letter-spacing: -0.02em;
+}
+
+.biolock__hint {
+  font-size: var(--text-sm);
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.biolock__btn {
+  margin-top: var(--space-4);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  background: var(--accent);
+  color: var(--text-on-accent);
+  border-radius: var(--radius);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+.biolock__btn:hover { background: var(--accent-hover); }
+.biolock__btn:disabled { opacity: 0.6; cursor: default; }
