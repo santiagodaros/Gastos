@@ -44,6 +44,9 @@ export interface GastoMensual {
   categoria: string;
   moneda: string;
   nota?: string | null;
+  fecha?: string | null;       // día del gasto (YYYY-MM-DD)
+  tarjeta_id?: number | null;  // tarjeta/medio con que se pagó
+  verificado?: boolean;        // conciliado contra el resumen
 }
 export type GastoMensualCreate = Omit<GastoMensual, "id">;
 
@@ -205,24 +208,43 @@ export const resumenApi = {
 
 // ─── Gastos Mensuales ─────────────────────────────────────────────────────────
 
+const GASTO_COLS = "id, mes, anio, nombre, monto, categoria, moneda, nota, fecha, tarjeta_id, verificado";
+
 export const gastosApi = {
   list: async (anio: number, mes: number): Promise<GastoMensual[]> => {
     const { data, error } = await supabase
-      .from("gastos_mensuales").select("id, mes, anio, nombre, monto, categoria, moneda, nota")
-      .eq("mes", mes).eq("anio", anio).order("id");
+      .from("gastos_mensuales").select(GASTO_COLS)
+      .eq("mes", mes).eq("anio", anio).order("fecha", { ascending: true }).order("id");
     return ok(data, error, []);
   },
 
   create: async (body: GastoMensualCreate): Promise<GastoMensual> => {
     const { data, error } = await supabase
-      .from("gastos_mensuales").insert({ ...body, user_id: await uid() }).select("id, mes, anio, nombre, monto, categoria, moneda").single();
+      .from("gastos_mensuales").insert({ ...body, user_id: await uid() }).select(GASTO_COLS).single();
     return ok(data, error);
   },
 
-  update: async (id: number, body: GastoMensualCreate): Promise<GastoMensual> => {
+  // Inserción masiva (usado por el importador de resúmenes).
+  createMany: async (bodies: GastoMensualCreate[]): Promise<number> => {
+    if (!bodies.length) return 0;
+    const userId = await uid();
+    const rows = bodies.map((b) => ({ ...b, user_id: userId }));
+    const { error } = await supabase.from("gastos_mensuales").insert(rows);
+    if (error) throw new Error(error.message);
+    return rows.length;
+  },
+
+  update: async (id: number, body: Partial<GastoMensualCreate>): Promise<GastoMensual> => {
     const { data, error } = await supabase
-      .from("gastos_mensuales").update(body).eq("id", id).select("id, mes, anio, nombre, monto, categoria, moneda").single();
+      .from("gastos_mensuales").update(body).eq("id", id).select(GASTO_COLS).single();
     return ok(data, error);
+  },
+
+  // Marca varios gastos como verificados (conciliados) de una.
+  marcarVerificados: async (ids: number[]) => {
+    if (!ids.length) return;
+    const { error } = await supabase.from("gastos_mensuales").update({ verificado: true }).in("id", ids);
+    if (error) throw new Error(error.message);
   },
 
   delete: async (id: number) => {

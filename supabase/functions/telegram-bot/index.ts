@@ -34,6 +34,11 @@ function nowAR(): { mes: number; anio: number } {
   return { mes: d.getUTCMonth() + 1, anio: d.getUTCFullYear() };
 }
 
+// Fecha de hoy en Argentina como YYYY-MM-DD (para el campo `fecha` del gasto).
+function todayAR(): string {
+  return new Date(Date.now() - 3 * 3600 * 1000).toISOString().split("T")[0];
+}
+
 function norm(s: string): string {
   return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
 }
@@ -115,7 +120,7 @@ async function handleGasto(tokens: string[], chatId: number) {
   const nombre = detalle || categoria;
 
   const { error } = await db.from("gastos_mensuales").insert({
-    user_id: APP_USER_ID, mes, anio, nombre, monto, categoria, moneda: "ARS",
+    user_id: APP_USER_ID, mes, anio, nombre, monto, categoria, moneda: "ARS", fecha: todayAR(),
   });
   if (error) { await sendMessage(chatId, `❌ Error: ${error.message}`); return; }
 

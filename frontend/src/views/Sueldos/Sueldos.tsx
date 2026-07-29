@@ -83,6 +83,23 @@ export default function Sueldos() {
 
       {error && <p style={{ color: "var(--negative)", fontSize: "var(--text-sm)" }}>{error}</p>}
 
+      <div style={{
+        display: "flex", gap: "var(--space-3)", alignItems: "flex-start",
+        padding: "var(--space-3) var(--space-4)", marginBottom: "var(--space-4)",
+        background: "var(--accent-muted)", border: "1px solid var(--border)",
+        borderRadius: "var(--radius)", fontSize: "var(--text-sm)",
+        color: "var(--text-secondary)", lineHeight: 1.55,
+      }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: 1 }}>
+          <circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" />
+        </svg>
+        <div>
+          En cada mes cargá <b>el sueldo de ese mes</b> (el de julio va en julio, lo cobres
+          el 30 de julio o el 1° de agosto). No importa el día que caiga la plata ni qué tarjeta
+          paga: <b>cada mes lleva su propio sueldo</b>, contra los gastos de ese mismo mes.
+        </div>
+      </div>
+
       <Card>
         {loading ? (
           <div className="abm-loading"><div className="spinner" /></div>

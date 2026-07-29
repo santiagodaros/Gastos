@@ -1,13 +1,19 @@
 import { useState, useEffect } from "react";
-import { gastosApi, categoriasApi, type GastoMensual, type GastoMensualCreate, type Categoria } from "../../api_client";
+import { gastosApi, categoriasApi, tarjetasApi, type GastoMensual, type GastoMensualCreate, type Categoria, type Tarjeta } from "../../api_client";
 import { getCotizacionDolar } from "../../lib/finance";
 import { Card } from "../../components/Card";
 import { Modal, ConfirmModal } from "../../components/Modal";
+import ImportResumen from "../../components/ImportResumen";
 import PeriodSelector from "../../components/PeriodSelector";
 import "../../styles/abm.css";
 import "./GastosMensuales.css";
 
 const MONEDAS = ["ARS", "USD"];
+
+function todayISO() {
+  const d = new Date();
+  return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().split("T")[0];
+}
 
 const EMPTY_FORM: GastoMensualCreate = {
   mes: new Date().getMonth() + 1,
@@ -17,11 +23,20 @@ const EMPTY_FORM: GastoMensualCreate = {
   categoria: "Otros",
   moneda: "ARS",
   nota: null,
+  fecha: todayISO(),
+  tarjeta_id: null,
+  verificado: false,
 };
 
 function fmt(n: number, moneda: string) {
   if (moneda === "USD") return `U$D ${n.toLocaleString("es-AR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   return n.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
+}
+
+function fmtFecha(iso?: string | null) {
+  if (!iso) return "—";
+  const [, m, d] = iso.split("-");
+  return `${d}/${m}`;
 }
 
 export default function GastosMensuales() {
@@ -31,6 +46,7 @@ export default function GastosMensuales() {
 
   const [items, setItems]           = useState<GastoMensual[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
+  const [tarjetas, setTarjetas]     = useState<Tarjeta[]>([]);
   const [dolarRate, setDolarRate]   = useState(0);
   const [loading, setLoading]       = useState(true);
   const [saving, setSaving]         = useState(false);
@@ -41,6 +57,7 @@ export default function GastosMensuales() {
   const [form, setForm]         = useState<GastoMensualCreate>(EMPTY_FORM);
   const [toDelete, setToDelete] = useState<GastoMensual | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showImport, setShowImport] = useState(false);
 
   function prevMonth() {
     if (mes === 1) { setMes(12); setAnio((y) => y - 1); }
@@ -63,17 +80,18 @@ export default function GastosMensuales() {
   useEffect(() => { load(); }, [anio, mes]);
   useEffect(() => {
     categoriasApi.list().then(setCategorias).catch(() => {});
+    tarjetasApi.list().then(setTarjetas).catch(() => {});
     getCotizacionDolar().then(setDolarRate).catch(() => {});
   }, []);
 
   function openAdd() {
-    setForm({ ...EMPTY_FORM, mes, anio });
+    setForm({ ...EMPTY_FORM, mes, anio, fecha: todayISO() });
     setEditItem(null);
     setModal("add");
   }
 
   function openEdit(item: GastoMensual) {
-    setForm({ mes: item.mes, anio: item.anio, nombre: item.nombre, monto: item.monto, categoria: item.categoria, moneda: item.moneda, nota: item.nota ?? null });
+    setForm({ mes: item.mes, anio: item.anio, nombre: item.nombre, monto: item.monto, categoria: item.categoria, moneda: item.moneda, nota: item.nota ?? null, fecha: item.fecha ?? todayISO(), tarjeta_id: item.tarjeta_id ?? null, verificado: item.verificado ?? false });
     setEditItem(item);
     setModal("edit");
   }
@@ -118,13 +136,26 @@ export default function GastosMensuales() {
           {!loading && (
             <span className="badge badge--neutral">{items.length} registros</span>
           )}
+          {!loading && items.some((i) => i.tarjeta_id && !i.verificado) && (
+            <span className="badge" style={{ background: "var(--warning-muted)", color: "var(--warning)" }}>
+              {items.filter((i) => i.tarjeta_id && !i.verificado).length} sin verificar
+            </span>
+          )}
         </div>
-        <button className="btn-primary" onClick={openAdd}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
-          </svg>
-          Agregar
-        </button>
+        <div style={{ display: "flex", gap: "var(--space-2)" }}>
+          <button className="btn-ghost" onClick={() => setShowImport(true)} title="Importar resumen de tarjeta">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Importar resumen
+          </button>
+          <button className="btn-primary" onClick={openAdd}>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+            </svg>
+            Agregar
+          </button>
+        </div>
       </div>
 
       {error && <p style={{ color: "var(--negative)", fontSize: "var(--text-sm)" }}>{error}</p>}
@@ -143,6 +174,7 @@ export default function GastosMensuales() {
           <table className="abm-table">
             <thead>
               <tr>
+                <th style={{ width: 56 }}>Fecha</th>
                 <th>Nombre</th>
                 <th>Categoría</th>
                 <th style={{ textAlign: "right" }}>Monto</th>
@@ -152,8 +184,22 @@ export default function GastosMensuales() {
             <tbody>
               {items.map((item) => (
                 <tr key={item.id}>
+                  <td style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums", fontSize: "var(--text-sm)" }}>
+                    {fmtFecha(item.fecha)}
+                  </td>
                   <td>
-                    <span style={{ color: "var(--text-primary)", fontWeight: "var(--font-medium)" }}>{item.nombre}</span>
+                    <span style={{ color: "var(--text-primary)", fontWeight: "var(--font-medium)" }}>
+                      {item.verificado && (
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--positive)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" style={{ marginRight: 5, verticalAlign: "middle" }}>
+                          <polyline points="20 6 9 17 4 12" />
+                        </svg>
+                      )}
+                      {item.nombre}
+                    </span>
+                    {item.tarjeta_id && (() => {
+                      const t = tarjetas.find((x) => x.id === item.tarjeta_id);
+                      return t ? <span className="badge badge--accent" style={{ marginLeft: 6, fontSize: "var(--text-xs)" }}>{t.nombre}</span> : null;
+                    })()}
                     {item.nota && <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 }}>{item.nota}</div>}
                   </td>
                   <td>
@@ -189,7 +235,7 @@ export default function GastosMensuales() {
             </tbody>
             <tfoot>
               <tr>
-                <td colSpan={2} style={{ paddingTop: "var(--space-4)", fontSize: "var(--text-xs)", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                <td colSpan={3} style={{ paddingTop: "var(--space-4)", fontSize: "var(--text-xs)", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                   Total ARS
                   {dolarRate > 0 && items.some((i) => i.moneda === "USD") && (
                     <span style={{ display: "block", marginTop: 2, textTransform: "none", letterSpacing: 0 }}>USD @ {fmt(dolarRate, "ARS")}</span>
@@ -247,6 +293,28 @@ export default function GastosMensuales() {
                 </select>
               </div>
             </div>
+            <div className="form__row">
+              <div className="form__field">
+                <label className="form__label">Fecha</label>
+                <input
+                  className="form__input"
+                  type="date"
+                  value={form.fecha ?? ""}
+                  onChange={(e) => setForm({ ...form, fecha: e.target.value || null })}
+                />
+              </div>
+              <div className="form__field">
+                <label className="form__label">Tarjeta / medio</label>
+                <select
+                  className="form__select"
+                  value={form.tarjeta_id ?? ""}
+                  onChange={(e) => setForm({ ...form, tarjeta_id: e.target.value ? parseInt(e.target.value) : null })}
+                >
+                  <option value="">Efectivo / Débito</option>
+                  {tarjetas.map((t) => <option key={t.id} value={t.id}>{t.nombre} ···{t.ultimos_4}</option>)}
+                </select>
+              </div>
+            </div>
             <div className="form__field">
               <label className="form__label">Categoría</label>
               <select
@@ -288,6 +356,18 @@ export default function GastosMensuales() {
           onConfirm={handleDelete}
           onClose={() => setToDelete(null)}
           loading={deleting}
+        />
+      )}
+
+      {showImport && (
+        <ImportResumen
+          anio={anio}
+          mes={mes}
+          gastos={items}
+          tarjetas={tarjetas}
+          categorias={categorias}
+          onClose={() => setShowImport(false)}
+          onApplied={load}
         />
       )}
     </div>

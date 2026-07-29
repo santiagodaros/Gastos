@@ -1,0 +1,62 @@
+/* ============================================================
+   IMPORTAR RESUMEN — conciliación de tarjeta
+   ============================================================ */
+
+.ir-error {
+  color: var(--negative);
+  font-size: var(--text-sm);
+  background: var(--negative-muted);
+  border: 1px solid var(--negative);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-3);
+}
+
+.ir-hint { font-size: var(--text-sm); color: var(--text-secondary); line-height: 1.55; margin-bottom: var(--space-4); }
+
+.ir-pick { display: flex; flex-direction: column; }
+.ir-drop {
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: var(--space-3); padding: var(--space-8);
+  border: 1.5px dashed var(--border-strong); border-radius: var(--radius-lg);
+  color: var(--text-secondary); cursor: pointer; transition: all var(--transition-fast);
+}
+.ir-drop:hover { border-color: var(--accent); color: var(--accent); background: var(--accent-muted); }
+.ir-drop span { font-size: var(--text-sm); font-weight: var(--font-medium); }
+
+.ir-loading { display: flex; flex-direction: column; align-items: center; gap: var(--space-3); padding: var(--space-8); color: var(--text-muted); font-size: var(--text-sm); }
+
+/* Review */
+.ir-controls { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: flex-end; margin-bottom: var(--space-4); }
+.ir-badge { font-size: var(--text-xs); color: var(--text-muted); align-self: center; }
+.ir-ctrl { display: flex; flex-direction: column; gap: 4px; font-size: var(--text-xs); color: var(--text-muted); }
+.ir-ctrl select {
+  background: var(--bg-elevated); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  color: var(--text-primary); padding: var(--space-2) var(--space-3); font-size: var(--text-sm);
+}
+
+.ir-sec { margin-bottom: var(--space-4); }
+.ir-sec__title { font-size: var(--text-sm); font-weight: var(--font-semibold); margin-bottom: var(--space-2); color: var(--text-primary); }
+.ir-sec__title.ir-add { color: var(--positive); }
+.ir-sec__title.ir-ok { color: var(--text-secondary); }
+.ir-sec__title.ir-warn { color: var(--warning); }
+.ir-empty { font-size: var(--text-sm); color: var(--text-muted); }
+
+.ir-list { display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow-y: auto; }
+.ir-row {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-2) var(--space-3); border-radius: var(--radius-sm);
+  background: var(--bg-elevated); font-size: var(--text-sm); flex-wrap: wrap;
+}
+.ir-row.ir-muted { opacity: 0.7; }
+.ir-date { font-variant-numeric: tabular-nums; color: var(--text-muted); font-size: var(--text-xs); min-width: 38px; }
+.ir-check { color: var(--positive); font-weight: 700; }
+.ir-desc { flex: 1; min-width: 120px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ir-amount { font-variant-numeric: tabular-nums; font-weight: var(--font-semibold); color: var(--text-primary); }
+.ir-fix { display: inline-flex; align-items: center; gap: 5px; font-size: var(--text-xs); color: var(--warning); width: 100%; margin-left: 26px; }
+
+.ir-footer {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);
+  flex-wrap: wrap; border-top: 1px solid var(--border); padding-top: var(--space-4); margin-top: var(--space-2);
+}
+.ir-totals { display: flex; flex-direction: column; gap: 2px; font-size: var(--text-xs); color: var(--text-secondary); }
