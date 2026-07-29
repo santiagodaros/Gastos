@@ -24,8 +24,10 @@
   align-items: center;
   gap: var(--space-3);
   padding: 0 var(--space-8);
-  height: 64px;
-  min-height: 64px;
+  /* Deja espacio para el reloj/notch en PWA standalone (status-bar translúcida). */
+  padding-top: env(safe-area-inset-top);
+  height: calc(64px + env(safe-area-inset-top));
+  min-height: calc(64px + env(safe-area-inset-top));
   border-bottom: 1px solid var(--border-subtle);
   background: var(--bg-base);
   flex-shrink: 0;
@@ -105,8 +107,9 @@
 
   .layout__topbar {
     padding: 0 var(--space-4);
-    height: 56px;
-    min-height: 56px;
+    padding-top: env(safe-area-inset-top);
+    height: calc(56px + env(safe-area-inset-top));
+    min-height: calc(56px + env(safe-area-inset-top));
   }
 
   .layout__topbar-meta {

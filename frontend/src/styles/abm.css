@@ -330,9 +330,14 @@
     gap: var(--space-4);
   }
 
-  /* Tabla: mínimo ancho para que pueda scrollear */
+  /* Tabla: mínimo ancho + scroll horizontal DENTRO de la card
+     (si no, con overflow-x:hidden del main se recortaba a la derecha). */
   .abm-table {
     min-width: 480px;
+  }
+  .card:has(.abm-table) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
   }
 
   /* Acciones de fila: siempre visibles en touch (no hay hover) */

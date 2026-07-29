@@ -4,7 +4,7 @@
    - Estáticos same-origin (JS/CSS/íconos con hash de Vite): cache-first.
    - Todo lo cross-origin (Supabase, dolarapi): passthrough, NO se cachea.
    Subí el número de versión para forzar refresco del cache tras un deploy. */
-const VERSION = "gastos-v1";
+const VERSION = "gastos-v2";
 const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {

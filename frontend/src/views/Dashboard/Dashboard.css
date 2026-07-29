@@ -74,7 +74,7 @@
 }
 
 @media (max-width: 767px) {
-  .dashboard__hero-inner { gap: var(--space-5); }
+  .dashboard__hero-inner { flex-direction: column; gap: var(--space-5); }
   .dashboard__hero-stats { min-width: 0; width: 100%; }
 }
 
