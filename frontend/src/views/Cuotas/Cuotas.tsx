@@ -44,6 +44,7 @@ export default function Cuotas() {
   const [form, setForm]         = useState<CuotaCreate>({ ...EMPTY_FORM });
   const [toDelete, setToDelete] = useState<Cuota | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [showTerminadas, setShowTerminadas] = useState(false);
 
   // — Proyección —
   const [proyData, setProyData]         = useState<ProyeccionMes[]>([]);
@@ -117,7 +118,16 @@ export default function Cuotas() {
     setExpandedMes((prev) => { const k = mesKey(item.mes, item.anio); return prev === k ? null : k; });
   }
 
-  const activas = items.filter((i) => i.activa);
+  // Una cuota está "terminada" cuando su última cuota ya pasó (por fecha).
+  // Sigue en la DB (historial), pero deja de contar y se puede ocultar.
+  const curPeriod = now.getFullYear() * 12 + now.getMonth() + 1;
+  const isFinished = (c: Cuota) =>
+    c.anio_inicio * 12 + c.mes_inicio + c.total_cuotas - 1 < curPeriod;
+
+  const terminadas = items.filter(isFinished);
+  const vigentes   = items.filter((c) => !isFinished(c));
+  const activas    = vigentes.filter((i) => i.activa);
+  const visibleItems = showTerminadas ? items : vigentes;
 
   return (
     <div className="abm">
@@ -150,6 +160,15 @@ export default function Cuotas() {
           <div className="abm__toolbar">
             <div className="abm__toolbar-left">
               <span className="badge badge--neutral">{activas.length} activas</span>
+              {terminadas.length > 0 && (
+                <button
+                  className="btn-ghost"
+                  style={{ fontSize: "var(--text-xs)", padding: "0.3rem 0.7rem" }}
+                  onClick={() => setShowTerminadas((v) => !v)}
+                >
+                  {showTerminadas ? "Ocultar" : "Ver"} terminadas ({terminadas.length})
+                </button>
+              )}
             </div>
             <button className="btn-primary" onClick={openAdd}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -182,7 +201,7 @@ export default function Cuotas() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((item) => {
+                  {visibleItems.map((item) => {
                     const pct = item.total_cuotas > 0 ? (item.cuota_actual / item.total_cuotas) * 100 : 0;
                     return (
                       <tr key={item.id} style={{ opacity: item.activa ? 1 : 0.45 }}>
@@ -210,9 +229,13 @@ export default function Cuotas() {
                             : <span style={{ color: "var(--text-muted)", fontSize: "var(--text-xs)" }}>—</span>}
                         </td>
                         <td>
-                          <span className={`badge ${item.activa ? "badge--positive" : "badge--neutral"}`}>
-                            {item.activa ? "Activa" : "Pausada"}
-                          </span>
+                          {isFinished(item) ? (
+                            <span className="badge badge--neutral">Terminada</span>
+                          ) : (
+                            <span className={`badge ${item.activa ? "badge--positive" : "badge--neutral"}`}>
+                              {item.activa ? "Activa" : "Pausada"}
+                            </span>
+                          )}
                         </td>
                         <td>
                           <div className="row-actions">

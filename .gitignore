@@ -32,6 +32,9 @@ frontend/src-tauri/target/
 # Claude local settings
 .claude/
 
+# Supabase CLI temp
+supabase/.temp/
+
 # OS
 .DS_Store
 Thumbs.db

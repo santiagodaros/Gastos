@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { resumenApi, resumenCategoriasApi, cuotasApi, type Resumen, type CategoriaBreakdown, type Cuota } from "../../api_client";
+import { resumenApi, resumenCategoriasApi, cuotasApi, presupuestoApi, ahorroMesApi, type Resumen, type CategoriaBreakdown, type Cuota, type Presupuesto } from "../../api_client";
 import { MetricCard } from "../../components/Card";
 import { Card } from "../../components/Card";
 import DonutChart, { type DonutSlice } from "../../components/DonutChart";
@@ -29,6 +29,8 @@ export default function Dashboard() {
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [catBreakdown, setCatBreakdown] = useState<CategoriaBreakdown[]>([]);
   const [cuotasPronto, setCuotasPronto] = useState<(Cuota & { remaining: number })[]>([]);
+  const [presu, setPresu]     = useState<Presupuesto | null>(null);
+  const [ahorroMes, setAhorroMes] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
 
@@ -42,10 +44,14 @@ export default function Dashboard() {
       resumenApi.get(anio, mes),
       resumenCategoriasApi.get(anio, mes),
       cuotasApi.list(),
+      presupuestoApi.get(),
+      ahorroMesApi.get(anio, mes),
     ])
-      .then(([r, cats, cuotas]) => {
+      .then(([r, cats, cuotas, presupuesto, ahorro]) => {
         setResumen(r);
         setCatBreakdown(cats);
+        setPresu(presupuesto);
+        setAhorroMes(ahorro);
         // Cuotas que terminan en los próximos 3 meses (inclusive el mes actual)
         const pronto = cuotas
           .filter((c) => c.activa)
@@ -88,6 +94,33 @@ export default function Dashboard() {
   const gastosPct = resumen && resumen.ingresos > 0
     ? Math.min(100, (resumen.total_gastos / resumen.ingresos) * 100)
     : 0;
+
+  // Fila de presupuesto: usado vs. asignado (budget = sueldo × %).
+  function renderBudgetRow(label: string, color: string, used: number, budget: number) {
+    const pct = budget > 0 ? (used / budget) * 100 : 0;
+    const remaining = budget - used;
+    const over = budget > 0 && used > budget;
+    return (
+      <div className="balance-bar" style={{ marginBottom: "var(--space-5)" }} key={label}>
+        <div className="balance-bar__header">
+          <span className="balance-bar__title" style={{ display: "inline-flex", alignItems: "center", gap: 8 }}>
+            <span style={{ width: 10, height: 10, borderRadius: "50%", background: color, flexShrink: 0 }} />
+            {label}
+          </span>
+          <span style={{ fontSize: "var(--text-xs)", fontWeight: "var(--font-semibold)", color: over ? "var(--negative)" : "var(--positive)", fontVariantNumeric: "tabular-nums" }}>
+            {over ? `excedido ${fmt(-remaining)}` : `quedan ${fmt(remaining)}`}
+          </span>
+        </div>
+        <div className="balance-bar__track">
+          <div className="balance-bar__fill" style={{ width: `${Math.min(100, pct)}%`, background: over ? "var(--negative)" : color }} />
+        </div>
+        <div className="balance-bar__labels">
+          <span>usaste {fmt(used)}</span>
+          <span>de {fmt(budget)}</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard">
@@ -199,6 +232,16 @@ export default function Dashboard() {
               footer={fmt(resumen.cuotas)}
             />
           </div>
+
+          {/* Presupuesto del mes */}
+          {presu && resumen.sueldo > 0 && (
+            <Card>
+              <p className="dashboard__section-title">Presupuesto del mes · sobre tu sueldo</p>
+              {renderBudgetRow("Gastos", "var(--warning)",  resumen.gastos_fijos + resumen.gastos_mensuales, resumen.sueldo * presu.pct_gastos / 100)}
+              {renderBudgetRow("Cuotas", "var(--negative)", resumen.cuotas, resumen.sueldo * presu.pct_cuotas / 100)}
+              {renderBudgetRow("Ahorro", "var(--positive)", ahorroMes, resumen.sueldo * presu.pct_ahorro / 100)}
+            </Card>
+          )}
 
           {/* Content row */}
           <div className="dashboard__content">

@@ -31,6 +31,7 @@ export default function BarChart({
   onBarClick,
   activeIndex = null,
 }: BarChartProps) {
+  const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [tooltip, setTooltip] = useState<{
     x: number;
@@ -38,6 +39,20 @@ export default function BarChart({
     bar: BarChartBar;
   } | null>(null);
   const [animated, setAnimated] = useState(false);
+  // Ancho real del contenedor → el viewBox coincide 1:1 con los píxeles y no se
+  // deforma (antes usaba 600 fijo + preserveAspectRatio=none y se estiraba).
+  const [wrapW, setWrapW] = useState(600);
+
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const cw = entries[0]?.contentRect.width;
+      if (cw && cw > 0) setWrapW(cw);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   // Animate on mount / data change
   useEffect(() => {
@@ -55,15 +70,15 @@ export default function BarChart({
   const paddingRight = 12;
   const paddingTop = 12;
   const paddingBottom = 36; // space for X labels
-  const barAreaWidth = 100; // percentage-based via viewBox
-  const svgWidth = 600;    // internal SVG units (viewBox)
+  const svgWidth = Math.max(320, Math.round(wrapW)); // = ancho real del contenedor
   const svgHeight = height;
   const chartW = svgWidth - paddingLeft - paddingRight;
   const chartH = svgHeight - paddingTop - paddingBottom;
 
   const barCount = data.length;
   const barGap = 0.25;
-  const barW = (chartW / barCount) * (1 - barGap);
+  // Ancho de barra con tope, para que en gráficos anchos no queden gigantes.
+  const barW = Math.min((chartW / barCount) * (1 - barGap), 80);
   const barStep = chartW / barCount;
 
   // Y axis ticks — 4 intervals
@@ -85,7 +100,7 @@ export default function BarChart({
   }
 
   return (
-    <div className="bar-chart" style={{ position: "relative" }}>
+    <div className="bar-chart" ref={wrapRef} style={{ position: "relative" }}>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${svgWidth} ${svgHeight}`}

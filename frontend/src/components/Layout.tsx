@@ -1,5 +1,7 @@
 import { useState } from "react";
 import Sidebar, { type ViewId } from "./Sidebar";
+import BottomNav from "./BottomNav";
+import QuickAdd from "./QuickAdd";
 import { useTheme } from "../lib/theme";
 import { useAuth } from "../lib/auth";
 import "./Layout.css";
@@ -23,6 +25,8 @@ export default function Layout({ children }: LayoutProps) {
   const [activeView, setActiveView] = useState<ViewId>("dashboard");
   const [collapsed, setCollapsed]   = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [quickAdd, setQuickAdd]     = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
   const { theme, toggleTheme }      = useTheme();
   const { signOut }                 = useAuth();
 
@@ -77,9 +81,26 @@ export default function Layout({ children }: LayoutProps) {
         </header>
 
         <main className="layout__main">
-          {children(activeView)}
+          <div key={`${activeView}-${refreshKey}`}>
+            {children(activeView)}
+          </div>
         </main>
       </div>
+
+      {/* Nav inferior (solo mobile) con botón de carga rápida */}
+      <BottomNav
+        activeView={activeView}
+        onNavigate={handleNavigate}
+        onQuickAdd={() => setQuickAdd(true)}
+      />
+
+      {/* Hoja de carga rápida: gasto / ingreso / cuota */}
+      {quickAdd && (
+        <QuickAdd
+          onClose={() => setQuickAdd(false)}
+          onSaved={() => setRefreshKey((k) => k + 1)}
+        />
+      )}
     </div>
   );
 }

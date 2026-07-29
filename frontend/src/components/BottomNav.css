@@ -1,0 +1,61 @@
+/* ============================================================
+   BOTTOM NAV — solo mobile (< 768px). Atajos + botón de carga rápida.
+   El menú completo sigue disponible vía el hamburguesa / drawer.
+   ============================================================ */
+
+.bottomnav { display: none; }
+
+@media (max-width: 767px) {
+  .bottomnav {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: 60px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    background: var(--bg-surface);
+    border-top: 1px solid var(--border);
+    z-index: var(--z-overlay);
+  }
+
+  .bottomnav__item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    flex: 1;
+    height: 100%;
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 0.68rem;
+    font-weight: var(--font-medium);
+    cursor: pointer;
+    transition: color var(--transition-fast);
+  }
+  .bottomnav__item svg { width: 21px; height: 21px; }
+  .bottomnav__item.active { color: var(--accent); }
+
+  .bottomnav__fab {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 54px;
+    height: 54px;
+    min-width: 54px;
+    margin-top: -22px;
+    border-radius: var(--radius-full);
+    background: var(--accent);
+    color: var(--text-on-accent);
+    border: 4px solid var(--bg-base);
+    box-shadow: var(--shadow), var(--shadow-glow);
+    cursor: pointer;
+    transition: transform var(--transition-fast), background var(--transition-fast);
+  }
+  .bottomnav__fab:active { transform: scale(0.92); }
+  .bottomnav__fab:hover { background: var(--accent-hover); }
+}

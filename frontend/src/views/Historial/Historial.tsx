@@ -130,7 +130,7 @@ export default function Historial() {
           {/* Balance chart (full width) */}
           <Card>
             <p className="historial__section-title">Balance mensual (valor absoluto)</p>
-            <BarChart data={balanceData} height={160} formatValue={fmt} />
+            <BarChart data={balanceData} height={220} formatValue={fmt} />
             <div style={{ marginTop: "var(--space-3)", display: "flex", flexWrap: "wrap", gap: "var(--space-4)" }}>
               {data.map((d) => (
                 <span

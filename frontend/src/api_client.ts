@@ -589,3 +589,46 @@ export const resumenCategoriasApi = {
       .sort((a, b) => b.total - a.total);
   },
 };
+
+// ─── Presupuesto (% del sueldo) ───────────────────────────────────────────────
+
+export interface Presupuesto {
+  pct_ahorro: number;
+  pct_cuotas: number;
+  pct_gastos: number;
+}
+
+const PRESUPUESTO_DEFAULT: Presupuesto = { pct_ahorro: 20, pct_cuotas: 30, pct_gastos: 50 };
+
+export const presupuestoApi = {
+  get: async (): Promise<Presupuesto> => {
+    // Si la tabla todavía no existe (migración sin correr) o hay error, usamos
+    // los valores por defecto en vez de romper el Dashboard.
+    const { data, error } = await supabase
+      .from("presupuesto").select("pct_ahorro, pct_cuotas, pct_gastos").maybeSingle();
+    if (error) return PRESUPUESTO_DEFAULT;
+    return data ?? PRESUPUESTO_DEFAULT;
+  },
+
+  upsert: async (body: Presupuesto): Promise<Presupuesto> => {
+    const { data, error } = await supabase
+      .from("presupuesto")
+      .upsert({ ...body, user_id: await uid() }, { onConflict: "user_id" })
+      .select("pct_ahorro, pct_cuotas, pct_gastos").single();
+    return ok(data, error);
+  },
+};
+
+// Ahorro depositado en metas durante un mes (usado como "ahorro usado" del presupuesto).
+export const ahorroMesApi = {
+  get: async (anio: number, mes: number): Promise<number> => {
+    const start = `${anio}-${String(mes).padStart(2, "0")}-01`;
+    const nextM = mes === 12 ? 1 : mes + 1;
+    const nextY = mes === 12 ? anio + 1 : anio;
+    const end = `${nextY}-${String(nextM).padStart(2, "0")}-01`;
+    const { data, error } = await supabase
+      .from("depositos_ahorro").select("monto, fecha").gte("fecha", start).lt("fecha", end);
+    if (error) return 0;
+    return (data ?? []).reduce((s: number, d: { monto: number }) => s + d.monto, 0);
+  },
+};

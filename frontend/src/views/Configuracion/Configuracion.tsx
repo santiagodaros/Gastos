@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import {
-  tarjetasApi, categoriasApi,
+  tarjetasApi, categoriasApi, presupuestoApi,
   type Tarjeta, type TarjetaCreate,
   type Categoria, type CategoriaCreate,
+  type Presupuesto,
 } from "../../api_client";
 import { Card } from "../../components/Card";
 import { Modal, ConfirmModal } from "../../components/Modal";
@@ -21,7 +22,7 @@ const COLORS = [
 const EMPTY_TARJETA: TarjetaCreate = { nombre: "", tipo: "Crédito", ultimos_4: "", activa: 1 };
 const EMPTY_CAT: CategoriaCreate   = { nombre: "", color: "#6366f1" };
 
-type Tab = "tarjetas" | "categorias";
+type Tab = "tarjetas" | "categorias" | "presupuesto";
 
 // ─── Helpers UI ───────────────────────────────────────────────────────────────
 
@@ -83,6 +84,12 @@ export default function Configuracion() {
   const [cToDelete, setCToDelete]   = useState<Categoria | null>(null);
   const [cDeleting, setCDeleting]   = useState(false);
 
+  // ── Presupuesto state ──
+  const [presu, setPresu]     = useState<Presupuesto>({ pct_ahorro: 20, pct_cuotas: 30, pct_gastos: 50 });
+  const [pLoading, setPLoading] = useState(true);
+  const [pSaving, setPSaving]   = useState(false);
+  const [pSaved, setPSaved]     = useState(false);
+
   // ── Loaders ──
   function loadTarjetas() {
     setTLoading(true);
@@ -92,8 +99,19 @@ export default function Configuracion() {
     setCLoading(true);
     categoriasApi.list().then(setCats).finally(() => setCLoading(false));
   }
+  function loadPresupuesto() {
+    setPLoading(true);
+    presupuestoApi.get().then(setPresu).finally(() => setPLoading(false));
+  }
 
-  useEffect(() => { loadTarjetas(); loadCats(); }, []);
+  useEffect(() => { loadTarjetas(); loadCats(); loadPresupuesto(); }, []);
+
+  async function handlePSubmit(e: React.FormEvent) {
+    e.preventDefault(); setPSaving(true); setPSaved(false);
+    try { await presupuestoApi.upsert(presu); setPSaved(true); }
+    catch (err: unknown) { alert((err as Error).message); }
+    finally { setPSaving(false); }
+  }
 
   // ── Tarjetas CRUD ──
   async function handleTSubmit(e: React.FormEvent) {
@@ -132,9 +150,74 @@ export default function Configuracion() {
 
       {/* Tabs */}
       <div style={{ display: "flex", gap: "0.25rem", marginBottom: "1rem", borderBottom: "1px solid var(--border)", paddingBottom: "0.75rem" }}>
-        <TabBtn active={tab === "tarjetas"}   onClick={() => setTab("tarjetas")}>Tarjetas</TabBtn>
-        <TabBtn active={tab === "categorias"} onClick={() => setTab("categorias")}>Categorías</TabBtn>
+        <TabBtn active={tab === "tarjetas"}    onClick={() => setTab("tarjetas")}>Tarjetas</TabBtn>
+        <TabBtn active={tab === "categorias"}  onClick={() => setTab("categorias")}>Categorías</TabBtn>
+        <TabBtn active={tab === "presupuesto"} onClick={() => setTab("presupuesto")}>Presupuesto</TabBtn>
       </div>
+
+      {/* ── TAB: PRESUPUESTO ── */}
+      {tab === "presupuesto" && (
+        <Card>
+          {pLoading ? (
+            <div className="abm-loading"><div className="spinner" /></div>
+          ) : (
+            <form className="form" onSubmit={handlePSubmit} style={{ maxWidth: 480 }}>
+              <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: "var(--space-2)" }}>
+                Definí qué porcentaje de tu <b>sueldo</b> destinás a cada cosa. En el Inicio vas a ver
+                cuánto llevás usado de cada uno este mes.
+              </p>
+
+              {([
+                { key: "pct_ahorro", label: "Ahorro", color: "var(--positive)" },
+                { key: "pct_cuotas", label: "Cuotas", color: "var(--negative)" },
+                { key: "pct_gastos", label: "Gastos", color: "var(--warning)" },
+              ] as const).map(({ key, label, color }) => (
+                <div className="form__field" key={key}>
+                  <label className="form__label" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{ width: 10, height: 10, borderRadius: "50%", background: color }} />
+                    {label}
+                  </label>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <input
+                      className="form__input"
+                      type="number" min={0} max={100} step={1}
+                      value={presu[key] || ""}
+                      onChange={(e) => { setPSaved(false); setPresu({ ...presu, [key]: parseFloat(e.target.value) || 0 }); }}
+                      style={{ maxWidth: 120 }}
+                    />
+                    <span style={{ color: "var(--text-muted)", fontWeight: "var(--font-semibold)" }}>%</span>
+                  </div>
+                </div>
+              ))}
+
+              {(() => {
+                const total = presu.pct_ahorro + presu.pct_cuotas + presu.pct_gastos;
+                const libre = 100 - total;
+                const over  = total > 100;
+                return (
+                  <div style={{
+                    display: "flex", justifyContent: "space-between", alignItems: "center",
+                    padding: "var(--space-3) var(--space-4)", borderRadius: "var(--radius)",
+                    background: "var(--bg-elevated)", border: `1px solid ${over ? "var(--negative)" : "var(--border)"}`,
+                  }}>
+                    <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}>
+                      {over ? "Te pasaste del 100%" : "Sin asignar"}
+                    </span>
+                    <span style={{ fontVariantNumeric: "tabular-nums", fontWeight: "var(--font-bold)", color: over ? "var(--negative)" : "var(--text-primary)" }}>
+                      {over ? `+${(total - 100).toFixed(0)}%` : `${libre.toFixed(0)}%`}
+                    </span>
+                  </div>
+                );
+              })()}
+
+              <div className="form__actions">
+                {pSaved && <span style={{ fontSize: "var(--text-sm)", color: "var(--positive)", marginRight: "auto" }}>✓ Guardado</span>}
+                <button type="submit" className="btn-primary" disabled={pSaving}>{pSaving ? "Guardando..." : "Guardar"}</button>
+              </div>
+            </form>
+          )}
+        </Card>
+      )}
 
       {/* ── TAB: TARJETAS ── */}
       {tab === "tarjetas" && (
