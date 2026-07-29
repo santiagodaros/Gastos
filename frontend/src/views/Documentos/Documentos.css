@@ -7,7 +7,10 @@
   gap: var(--space-2);
   margin-bottom: var(--space-6);
   border-bottom: 1px solid var(--border-subtle);
+  overflow-x: auto;
+  scrollbar-width: none;
 }
+.doc__tabs::-webkit-scrollbar { display: none; }
 .doc__tab {
   padding: var(--space-3) var(--space-4);
   background: none;
@@ -19,6 +22,8 @@
   cursor: pointer;
   transition: color var(--transition-fast), border-color var(--transition-fast);
   margin-bottom: -1px;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 .doc__tab:hover { color: var(--text-secondary); }
 .doc__tab.is-active {
@@ -46,7 +51,7 @@
   margin-bottom: var(--space-4);
 }
 .doc__month-title {
-  font-size: var(--text-md);
+  font-size: var(--text-lg);
   font-weight: var(--font-semibold);
   color: var(--text-primary);
 }

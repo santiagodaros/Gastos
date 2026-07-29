@@ -28,10 +28,10 @@ export default function Documentos() {
     <div className="doc">
       <div className="doc__tabs">
         <button className={`doc__tab${tab === "comprobantes" ? " is-active" : ""}`} onClick={() => setTab("comprobantes")}>
-          Comprobantes por mes
+          Comprobantes
         </button>
         <button className={`doc__tab${tab === "resumenes" ? " is-active" : ""}`} onClick={() => setTab("resumenes")}>
-          Resúmenes por tarjeta
+          Resúmenes
         </button>
       </div>
 
