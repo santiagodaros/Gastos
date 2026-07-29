@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   gastosApi, fijosApi, cuotasApi, tarjetasApi, categoriasApi,
-  type GastoMensual, type GastoMensualCreate, type GastoFijo, type Cuota, type Categoria, type Tarjeta,
+  type GastoMensual, type GastoMensualCreate, type GastoFijo, type Cuota, type CuotaCreate, type Categoria, type Tarjeta,
 } from "../api_client";
 import { Modal } from "./Modal";
 import type { StmtTx, ParsedStatement } from "../lib/galiciaParser";
@@ -35,6 +35,7 @@ export default function ImportResumen({ anio, mes, onClose, onApplied }: Props) 
   const [categorias, setCategorias] = useState<Categoria[]>([]);
 
   const [addSet, setAddSet] = useState<Set<number>>(new Set());
+  const [addCuotaSet, setAddCuotaSet] = useState<Set<number>>(new Set());
   const [fixSet, setFixSet] = useState<Set<number>>(new Set());
   const [categoria, setCategoria] = useState("Otros");
   const [tarjetaId, setTarjetaId] = useState<number | null>(null);
@@ -107,6 +108,7 @@ export default function ImportResumen({ anio, mes, onClose, onApplied }: Props) 
   useEffect(() => {
     if (!parsed) return;
     setAddSet(new Set(recon.faltantes.map((_, i) => i)));
+    setAddCuotaSet(new Set(recon.cuotasFalt.map((_, i) => i)));
     setFixSet(new Set(recon.enGastos.map((_, i) => i).filter((i) => recon.enGastos[i].gasto.fecha !== recon.enGastos[i].tx.fecha)));
   }, [parsed]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -135,6 +137,25 @@ export default function ImportResumen({ anio, mes, onClose, onApplied }: Props) 
         }
       }
       await gastosApi.marcarVerificados(recon.enGastos.map((c) => c.gasto.id));
+
+      // Crear las cuotas faltantes seleccionadas (en la sección Cuotas).
+      // El resumen dice "NN/MM" = cuota NN de MM en el mes reconciliado. El modelo
+      // de la app arranca en la cuota 1, así que calculo el mes de la cuota 1
+      // (NN-1 meses hacia atrás) y guardo cuota_actual=1.
+      for (let i = 0; i < recon.cuotasFalt.length; i++) {
+        if (!addCuotaSet.has(i)) continue;
+        const tx = recon.cuotasFalt[i];
+        const [nn, mm] = (tx.cuota ?? "1/1").split("/").map((s) => parseInt(s) || 1);
+        const startIdx = anio * 12 + (mes - 1) - (nn - 1);
+        const body: CuotaCreate = {
+          nombre: tx.descripcion, monto_cuota: tx.monto,
+          cuota_actual: 1, total_cuotas: mm,
+          mes_inicio: (startIdx % 12) + 1, anio_inicio: Math.floor(startIdx / 12),
+          activa: 1, moneda: tx.moneda, tarjeta_id: tarjetaId,
+          categoria: "Sin categoría", nota: null,
+        };
+        await cuotasApi.create(body);
+      }
 
       onApplied();
       onClose();
@@ -260,9 +281,10 @@ export default function ImportResumen({ anio, mes, onClose, onApplied }: Props) 
                   </li>
                 ))}
                 {recon.cuotasFalt.map((t, i) => (
-                  <li key={"f" + i} className="ir-row"><span style={{ color: "var(--warning)" }}>⚠️</span>
+                  <li key={"f" + i} className="ir-row">
+                    <input type="checkbox" checked={addCuotaSet.has(i)} onChange={() => toggle(addCuotaSet, setAddCuotaSet, i)} />
                     <span className="ir-date">{t.cuota}</span>
-                    <span className="ir-desc">{t.descripcion} <span className="ir-tag ir-tag--warn">no registrada en Cuotas</span></span>
+                    <span className="ir-desc">{t.descripcion} <span className="ir-tag ir-tag--warn">agregar a Cuotas</span></span>
                     <span className="ir-amount">{fmt(t.monto, t.moneda)}</span>
                   </li>
                 ))}
@@ -290,7 +312,7 @@ export default function ImportResumen({ anio, mes, onClose, onApplied }: Props) 
               <span>{okCount} ya cargados · {recon.faltantes.length} faltan</span>
             </div>
             <button className="btn-primary" onClick={apply} disabled={applying}>
-              {applying ? "Aplicando..." : `Aplicar (${addSet.size} nuevos)`}
+              {applying ? "Aplicando..." : `Aplicar (${addSet.size} gastos${addCuotaSet.size ? `, ${addCuotaSet.size} cuotas` : ""})`}
             </button>
           </div>
         </div>
