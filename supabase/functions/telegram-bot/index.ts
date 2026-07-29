@@ -84,9 +84,10 @@ const HELP = `<b>Carga rápida — comandos</b>
 <code>cuota heladera 15000 12</code>
 (nombre, monto por cuota, total de cuotas)
 
-📎 <b>Transferencia</b>
-Mandá la foto o PDF del comprobante con el monto en el epígrafe:
-<code>50000 alquiler</code>
+📎 <b>Ticket / comprobante</b>
+Mandá una foto (o PDF) con el monto en el epígrafe y queda con el comprobante adjunto:
+<code>12500 super</code>
+Para marcarlo como transferencia: <code>transferencia 50000 alquiler</code>
 
 Formatos de monto: <code>8000</code>, <code>8.000</code>, <code>12k</code>, <code>12500,50</code>`;
 
@@ -222,7 +223,14 @@ async function handleComprobante(msg: any, chatId: number) {
   }
 
   // Parseo del epígrafe (igual que un gasto): monto + categoría + detalle.
-  const tokens: string[] = caption.split(/\s+/);
+  // Si empieza con "transferencia", lo marca como ese medio; si no, es un
+  // ticket/comprobante de un gasto normal.
+  let tokens: string[] = caption.split(/\s+/);
+  let medio: string | null = null;
+  if (tokens.length && (norm(tokens[0]) === "transferencia" || norm(tokens[0]) === "transf")) {
+    medio = "transferencia";
+    tokens = tokens.slice(1);
+  }
   let monto: number | null = null;
   const words: string[] = [];
   for (const t of tokens) {
@@ -250,12 +258,13 @@ async function handleComprobante(msg: any, chatId: number) {
 
   const { error } = await db.from("gastos_mensuales").insert({
     user_id: APP_USER_ID, mes, anio, nombre, monto, categoria, moneda: "ARS",
-    fecha: todayAR(), medio: "transferencia", comprobante_url: comprobante,
+    fecha: todayAR(), medio, comprobante_url: comprobante,
   });
   if (error) { await sendMessage(chatId, `❌ Error: ${error.message}`); return; }
 
   const montoFmt = monto.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
-  await sendMessage(chatId, `✅ <b>Transferencia</b> ${montoFmt} · ${categoria} · ${nombre} · ${MONTHS[mes - 1]} ${anio}${comprobante ? " · 📎 comprobante guardado" : ""}`);
+  const tipoLabel = medio === "transferencia" ? "Transferencia" : "Gasto";
+  await sendMessage(chatId, `✅ <b>${tipoLabel}</b> ${montoFmt} · ${categoria} · ${nombre} · ${MONTHS[mes - 1]} ${anio}${comprobante ? " · 📎 comprobante guardado" : ""}`);
 }
 
 // ── Entry point ───────────────────────────────────────────────

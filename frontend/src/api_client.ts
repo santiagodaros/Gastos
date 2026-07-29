@@ -5,6 +5,7 @@
  */
 
 import { supabase } from "./lib/supabase";
+import { compressImage } from "./lib/comprobante";
 import {
   getCotizacionDolar,
   calcularResumen,
@@ -97,6 +98,7 @@ export interface Cuota {
   tarjeta_id: number | null;
   categoria: string;
   nota?: string | null;
+  comprobante_url?: string | null;
 }
 export type CuotaCreate = Omit<Cuota, "id">;
 
@@ -214,12 +216,34 @@ export const resumenApi = {
 
 const GASTO_COLS = "id, mes, anio, nombre, monto, categoria, moneda, nota, fecha, tarjeta_id, verificado, medio, comprobante_url";
 
-// Genera una URL firmada temporal para ver un comprobante guardado en Storage.
+// Subida/lectura/borrado de comprobantes en Storage.
 export const comprobantesApi = {
   signedUrl: async (path: string): Promise<string | null> => {
     const { data, error } = await supabase.storage.from("comprobantes").createSignedUrl(path, 120);
     if (error) return null;
     return data?.signedUrl ?? null;
+  },
+
+  // Sube un archivo (comprime si es imagen) y devuelve su ruta en Storage.
+  upload: async (file: File): Promise<string> => {
+    const userId = await uid();
+    const isImage = file.type.startsWith("image/");
+    let body: Blob = file;
+    let ext = (file.name.split(".").pop() || "jpg").toLowerCase();
+    let contentType = file.type || "application/octet-stream";
+    if (isImage) {
+      body = await compressImage(file);
+      ext = "jpg";
+      contentType = "image/jpeg";
+    }
+    const path = `${userId}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}.${ext}`;
+    const { error } = await supabase.storage.from("comprobantes").upload(path, body, { contentType, upsert: false });
+    if (error) throw new Error(error.message);
+    return path;
+  },
+
+  remove: async (path: string) => {
+    await supabase.storage.from("comprobantes").remove([path]);
   },
 };
 
@@ -393,7 +417,7 @@ export const tarjetasApi = {
 
 // ─── Cuotas ───────────────────────────────────────────────────────────────────
 
-const CUOTA_COLS = "id, nombre, monto_cuota, cuota_actual, total_cuotas, mes_inicio, anio_inicio, activa, moneda, tarjeta_id, categoria, nota";
+const CUOTA_COLS = "id, nombre, monto_cuota, cuota_actual, total_cuotas, mes_inicio, anio_inicio, activa, moneda, tarjeta_id, categoria, nota, comprobante_url";
 
 export const cuotasApi = {
   list: async (): Promise<Cuota[]> => {

@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { cuotasApi, tarjetasApi, proyeccionApi, categoriasApi, type Cuota, type CuotaCreate, type Tarjeta, type ProyeccionMes, type Categoria } from "../../api_client";
+import { cuotasApi, tarjetasApi, proyeccionApi, categoriasApi, comprobantesApi, type Cuota, type CuotaCreate, type Tarjeta, type ProyeccionMes, type Categoria } from "../../api_client";
 import { Card, MetricCard } from "../../components/Card";
 import { Modal, ConfirmModal } from "../../components/Modal";
+import Lightbox from "../../components/Lightbox";
 import BarChart, { type BarChartBar } from "../../components/BarChart";
 import "../../styles/abm.css";
 
@@ -25,7 +26,7 @@ const now = new Date();
 const EMPTY_FORM: CuotaCreate = {
   nombre: "", monto_cuota: 0, cuota_actual: 1, total_cuotas: 12,
   mes_inicio: now.getMonth() + 1, anio_inicio: now.getFullYear(),
-  activa: 1, moneda: "ARS", tarjeta_id: null, categoria: "Sin categoría", nota: null,
+  activa: 1, moneda: "ARS", tarjeta_id: null, categoria: "Sin categoría", nota: null, comprobante_url: null,
 };
 
 type Tab = "lista" | "proyeccion";
@@ -45,6 +46,8 @@ export default function Cuotas() {
   const [toDelete, setToDelete] = useState<Cuota | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [showTerminadas, setShowTerminadas] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [viewPath, setViewPath] = useState<string | null>(null);
 
   // — Proyección —
   const [proyData, setProyData]         = useState<ProyeccionMes[]>([]);
@@ -74,26 +77,37 @@ export default function Cuotas() {
   }, [tab, meses]);
 
   // CRUD handlers
-  function openAdd()  { setForm({ ...EMPTY_FORM }); setEditItem(null); setModal("add"); }
+  function openAdd()  { setForm({ ...EMPTY_FORM }); setFile(null); setEditItem(null); setModal("add"); }
   function openEdit(item: Cuota) {
     setForm({ nombre: item.nombre, monto_cuota: item.monto_cuota, cuota_actual: item.cuota_actual,
       total_cuotas: item.total_cuotas, mes_inicio: item.mes_inicio, anio_inicio: item.anio_inicio,
       activa: item.activa, moneda: item.moneda, tarjeta_id: item.tarjeta_id,
-      categoria: item.categoria || "Sin categoría", nota: item.nota ?? null });
-    setEditItem(item); setModal("edit");
+      categoria: item.categoria || "Sin categoría", nota: item.nota ?? null, comprobante_url: item.comprobante_url ?? null });
+    setFile(null); setEditItem(item); setModal("edit");
   }
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault(); setSaving(true);
     try {
-      if (modal === "edit" && editItem) await cuotasApi.update(editItem.id, form);
-      else await cuotasApi.create(form);
+      const body = { ...form };
+      if (file) {
+        const path = await comprobantesApi.upload(file);
+        if (editItem?.comprobante_url && editItem.comprobante_url !== path) await comprobantesApi.remove(editItem.comprobante_url);
+        body.comprobante_url = path;
+      } else if (modal === "edit" && editItem?.comprobante_url && !form.comprobante_url) {
+        await comprobantesApi.remove(editItem.comprobante_url);
+      }
+      if (modal === "edit" && editItem) await cuotasApi.update(editItem.id, body);
+      else await cuotasApi.create(body);
       setModal(null); load();
     } catch (e: unknown) { alert((e as Error).message); }
     finally { setSaving(false); }
   }
   async function handleDelete() {
     if (!toDelete) return; setDeleting(true);
-    try { await cuotasApi.delete(toDelete.id); setToDelete(null); load(); }
+    try {
+      if (toDelete.comprobante_url) await comprobantesApi.remove(toDelete.comprobante_url);
+      await cuotasApi.delete(toDelete.id); setToDelete(null); load();
+    }
     finally { setDeleting(false); }
   }
   function tarjetaNombre(id: number | null) {
@@ -207,6 +221,9 @@ export default function Cuotas() {
                       <tr key={item.id} style={{ opacity: item.activa ? 1 : 0.45 }}>
                         <td>
                           <span style={{ color: "var(--text-primary)", fontWeight: "var(--font-medium)" }}>{item.nombre}</span>
+                          {item.comprobante_url && (
+                            <button onClick={() => setViewPath(item.comprobante_url!)} title="Ver comprobante" style={{ marginLeft: 6, background: "none", border: "none", cursor: "pointer" }}>📎</button>
+                          )}
                           <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 }}>
                             Inicio: {MONTHS[item.mes_inicio - 1]} {item.anio_inicio}
                           </div>
@@ -461,6 +478,22 @@ export default function Cuotas() {
                 style={{ resize: "vertical" }}
               />
             </div>
+            <div className="form__field">
+              <label className="form__label">Comprobante / factura <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(opcional)</span></label>
+              {form.comprobante_url && !file ? (
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                  <button type="button" className="btn-ghost" onClick={() => setViewPath(form.comprobante_url!)}>📎 Ver adjunto</button>
+                  <button type="button" className="btn-ghost" style={{ color: "var(--negative)" }} onClick={() => setForm({ ...form, comprobante_url: null })}>Quitar</button>
+                </div>
+              ) : (
+                <>
+                  <input type="file" accept="image/*,application/pdf" capture="environment"
+                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }} />
+                  {file && <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 4 }}>{file.name}</div>}
+                </>
+              )}
+            </div>
             <div className="form__actions">
               <button type="button" className="btn-ghost" onClick={() => setModal(null)}>Cancelar</button>
               <button type="submit" className="btn-primary" disabled={saving}>{saving ? "Guardando..." : "Guardar"}</button>
@@ -472,6 +505,8 @@ export default function Cuotas() {
       {toDelete && (
         <ConfirmModal subject={toDelete.nombre} onConfirm={handleDelete} onClose={() => setToDelete(null)} loading={deleting} />
       )}
+
+      {viewPath && <Lightbox path={viewPath} onClose={() => setViewPath(null)} />}
     </div>
   );
 }

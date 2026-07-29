@@ -4,6 +4,7 @@ import { getCotizacionDolar } from "../../lib/finance";
 import { Card } from "../../components/Card";
 import { Modal, ConfirmModal } from "../../components/Modal";
 import ImportResumen from "../../components/ImportResumen";
+import Lightbox from "../../components/Lightbox";
 import PeriodSelector from "../../components/PeriodSelector";
 import "../../styles/abm.css";
 import "./GastosMensuales.css";
@@ -26,6 +27,8 @@ const EMPTY_FORM: GastoMensualCreate = {
   fecha: todayISO(),
   tarjeta_id: null,
   verificado: false,
+  medio: null,
+  comprobante_url: null,
 };
 
 function fmt(n: number, moneda: string) {
@@ -58,6 +61,8 @@ export default function GastosMensuales() {
   const [toDelete, setToDelete] = useState<GastoMensual | null>(null);
   const [deleting, setDeleting] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
+  const [viewPath, setViewPath] = useState<string | null>(null);
 
   function prevMonth() {
     if (mes === 1) { setMes(12); setAnio((y) => y - 1); }
@@ -86,12 +91,14 @@ export default function GastosMensuales() {
 
   function openAdd() {
     setForm({ ...EMPTY_FORM, mes, anio, fecha: todayISO() });
+    setFile(null);
     setEditItem(null);
     setModal("add");
   }
 
   function openEdit(item: GastoMensual) {
-    setForm({ mes: item.mes, anio: item.anio, nombre: item.nombre, monto: item.monto, categoria: item.categoria, moneda: item.moneda, nota: item.nota ?? null, fecha: item.fecha ?? todayISO(), tarjeta_id: item.tarjeta_id ?? null, verificado: item.verificado ?? false });
+    setForm({ mes: item.mes, anio: item.anio, nombre: item.nombre, monto: item.monto, categoria: item.categoria, moneda: item.moneda, nota: item.nota ?? null, fecha: item.fecha ?? todayISO(), tarjeta_id: item.tarjeta_id ?? null, verificado: item.verificado ?? false, medio: item.medio ?? null, comprobante_url: item.comprobante_url ?? null });
+    setFile(null);
     setEditItem(item);
     setModal("edit");
   }
@@ -100,10 +107,20 @@ export default function GastosMensuales() {
     e.preventDefault();
     setSaving(true);
     try {
+      const body = { ...form };
+      if (file) {
+        const path = await comprobantesApi.upload(file);
+        if (editItem?.comprobante_url && editItem.comprobante_url !== path) {
+          await comprobantesApi.remove(editItem.comprobante_url);
+        }
+        body.comprobante_url = path;
+      } else if (modal === "edit" && editItem?.comprobante_url && !form.comprobante_url) {
+        await comprobantesApi.remove(editItem.comprobante_url);
+      }
       if (modal === "edit" && editItem) {
-        await gastosApi.update(editItem.id, form);
+        await gastosApi.update(editItem.id, body);
       } else {
-        await gastosApi.create(form);
+        await gastosApi.create(body);
       }
       setModal(null);
       load();
@@ -114,16 +131,11 @@ export default function GastosMensuales() {
     }
   }
 
-  async function verComprobante(path: string) {
-    const url = await comprobantesApi.signedUrl(path);
-    if (url) window.open(url, "_blank");
-    else alert("No pude abrir el comprobante.");
-  }
-
   async function handleDelete() {
     if (!toDelete) return;
     setDeleting(true);
     try {
+      if (toDelete.comprobante_url) await comprobantesApi.remove(toDelete.comprobante_url);
       await gastosApi.delete(toDelete.id);
       setToDelete(null);
       load();
@@ -211,7 +223,7 @@ export default function GastosMensuales() {
                     )}
                     {item.comprobante_url && (
                       <button
-                        onClick={() => verComprobante(item.comprobante_url!)}
+                        onClick={() => setViewPath(item.comprobante_url!)}
                         title="Ver comprobante"
                         style={{ marginLeft: 6, background: "none", border: "none", cursor: "pointer", fontSize: "var(--text-sm)" }}
                       >📎</button>
@@ -355,6 +367,26 @@ export default function GastosMensuales() {
                 style={{ resize: "vertical" }}
               />
             </div>
+            <div className="form__field">
+              <label className="form__label">Comprobante / ticket <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(opcional)</span></label>
+              {form.comprobante_url && !file ? (
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                  <button type="button" className="btn-ghost" onClick={() => setViewPath(form.comprobante_url!)}>📎 Ver adjunto</button>
+                  <button type="button" className="btn-ghost" style={{ color: "var(--negative)" }} onClick={() => setForm({ ...form, comprobante_url: null })}>Quitar</button>
+                </div>
+              ) : (
+                <>
+                  <input
+                    type="file"
+                    accept="image/*,application/pdf"
+                    capture="environment"
+                    onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+                    style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}
+                  />
+                  {file && <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 4 }}>{file.name}</div>}
+                </>
+              )}
+            </div>
             <div className="form__actions">
               <button type="button" className="btn-ghost" onClick={() => setModal(null)}>Cancelar</button>
               <button type="submit" className="btn-primary" disabled={saving}>
@@ -383,6 +415,8 @@ export default function GastosMensuales() {
           onApplied={load}
         />
       )}
+
+      {viewPath && <Lightbox path={viewPath} onClose={() => setViewPath(null)} />}
     </div>
   );
 }
