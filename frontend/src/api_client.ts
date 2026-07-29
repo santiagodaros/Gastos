@@ -792,10 +792,16 @@ export const resumenesApi = {
     return (data ?? []) as ResumenImportado[];
   },
 
-  create: async (body: ResumenImportadoCreate): Promise<void> => {
-    const { error } = await supabase
-      .from("resumenes_importados").insert({ ...body, user_id: await uid() });
+  create: async (body: ResumenImportadoCreate): Promise<number | null> => {
+    const { data, error } = await supabase
+      .from("resumenes_importados").insert({ ...body, user_id: await uid() }).select("id").single();
     if (error) throw new Error(error.message);
+    return data?.id ?? null;
+  },
+
+  // Reasigna la tarjeta de un resumen ya guardado (si en la revisión la cambiás).
+  setTarjeta: async (id: number, tarjeta_id: number | null, tarjeta: string | null) => {
+    await supabase.from("resumenes_importados").update({ tarjeta_id, tarjeta }).eq("id", id);
   },
 
   delete: async (id: number, pdfPath: string | null) => {

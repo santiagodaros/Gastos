@@ -24,7 +24,8 @@ const near = (a: number, b: number) => Math.abs(a - b) < 0.5;
 export default function ImportResumen({ anio, mes, onClose, onApplied }: Props) {
   const [step, setStep] = useState<"pick" | "parsing" | "review">("pick");
   const [parsed, setParsed] = useState<ParsedStatement | null>(null);
-  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [savedResumenId, setSavedResumenId] = useState<number | null>(null);
+  const [savedNote, setSavedNote] = useState<"nuevo" | "existente" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
 
@@ -64,16 +65,43 @@ export default function ImportResumen({ anio, mes, onClose, onApplied }: Props) 
         return;
       }
       setParsed(res);
-      setPdfFile(file);
       const guess = tarjetas.find((t) =>
         res.tarjeta && (t.nombre.toUpperCase().includes(res.tarjeta) || t.tipo.toUpperCase().includes(res.tarjeta.slice(0, 4)))
       );
       setTarjetaId(guess?.id ?? null);
       setStep("review");
+      // Guardar el resumen en Documentos apenas se importa (sin esperar a "Aplicar").
+      void guardarResumen(res, file, guess?.id ?? null);
     } catch (e) {
       setError("No pude leer el PDF: " + (e as Error).message);
       setStep("pick");
     }
+  }
+
+  // Sube el PDF + guarda el resumen (dedup por período + total + cantidad).
+  async function guardarResumen(res: ParsedStatement, file: File, tid: number | null) {
+    try {
+      const txs = res.transacciones;
+      const totalArs = txs.filter((t) => t.moneda !== "USD").reduce((s, t) => s + t.monto, 0);
+      const totalUsd = txs.filter((t) => t.moneda === "USD").reduce((s, t) => s + t.monto, 0);
+
+      const existentes = await resumenesApi.list();
+      const dup = existentes.find((r) =>
+        r.periodo_mes === mes && r.periodo_anio === anio &&
+        r.cant_items === txs.length && Math.round(r.total_ars) === Math.round(totalArs));
+      if (dup) { setSavedResumenId(dup.id); setSavedNote("existente"); return; }
+
+      const pdfPath = await comprobantesApi.upload(file);
+      const id = await resumenesApi.create({
+        tarjeta: res.tarjeta ?? tarjetas.find((t) => t.id === tid)?.nombre ?? null,
+        tarjeta_id: tid,
+        periodo_mes: mes, periodo_anio: anio,
+        total_ars: totalArs, total_usd: totalUsd, cant_items: txs.length,
+        pdf_path: pdfPath,
+      });
+      setSavedResumenId(id);
+      setSavedNote("nuevo");
+    } catch { /* si falla el guardado del resumen, no bloquea la conciliación */ }
   }
 
   // Cruce contra las 3 secciones.
@@ -159,20 +187,12 @@ export default function ImportResumen({ anio, mes, onClose, onApplied }: Props) 
         await cuotasApi.create(body);
       }
 
-      // Guardar el resumen importado (PDF + totales) para verlo después por tarjeta.
-      try {
-        const txs = parsed?.transacciones ?? [];
-        const totalArs = txs.filter((t) => t.moneda !== "USD").reduce((s, t) => s + t.monto, 0);
-        const totalUsd = txs.filter((t) => t.moneda === "USD").reduce((s, t) => s + t.monto, 0);
-        const pdfPath = pdfFile ? await comprobantesApi.upload(pdfFile) : null;
-        await resumenesApi.create({
-          tarjeta: parsed?.tarjeta ?? tarjetas.find((t) => t.id === tarjetaId)?.nombre ?? null,
-          tarjeta_id: tarjetaId,
-          periodo_mes: mes, periodo_anio: anio,
-          total_ars: totalArs, total_usd: totalUsd, cant_items: txs.length,
-          pdf_path: pdfPath,
-        });
-      } catch { /* si falla el guardado del resumen, no bloquea la conciliación */ }
+      // El resumen ya se guardó al importar; si cambiaste la tarjeta en la revisión, la reasigno.
+      if (savedResumenId !== null) {
+        try {
+          await resumenesApi.setTarjeta(savedResumenId, tarjetaId, tarjetas.find((t) => t.id === tarjetaId)?.nombre ?? parsed?.tarjeta ?? null);
+        } catch { /* no bloquea */ }
+      }
 
       onApplied();
       onClose();
@@ -214,6 +234,11 @@ export default function ImportResumen({ anio, mes, onClose, onApplied }: Props) 
         <div className="ir-review">
           <div className="ir-controls">
             <div className="ir-badge">Detectado: <b>{parsed.tarjeta ?? "—"}</b></div>
+            {savedNote && (
+              <div className="ir-badge ir-badge--ok">
+                {savedNote === "nuevo" ? "✓ Guardado en Documentos" : "✓ Ya estaba en Documentos"}
+              </div>
+            )}
             <label className="ir-ctrl">
               Tarjeta
               <select value={tarjetaId ?? ""} onChange={(e) => setTarjetaId(e.target.value ? parseInt(e.target.value) : null)}>
