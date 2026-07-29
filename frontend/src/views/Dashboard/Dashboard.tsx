@@ -3,6 +3,7 @@ import { resumenApi, resumenCategoriasApi, cuotasApi, presupuestoApi, ahorroMesA
 import { MetricCard } from "../../components/Card";
 import { Card } from "../../components/Card";
 import DonutChart, { type DonutSlice } from "../../components/DonutChart";
+import ImportResumen from "../../components/ImportResumen";
 import "../../styles/abm.css";
 import "./Dashboard.css";
 
@@ -33,6 +34,8 @@ export default function Dashboard() {
   const [ahorroMes, setAhorroMes] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError]     = useState<string | null>(null);
+  const [showImport, setShowImport] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     setLoading(true);
@@ -66,7 +69,7 @@ export default function Dashboard() {
       })
       .catch((e: Error) => setError(e.message))
       .finally(() => setLoading(false));
-  }, [anio, mes]);
+  }, [anio, mes, refreshKey]);
 
   function prevMonth() {
     if (mes === 1) { setMes(12); setAnio((y) => y - 1); }
@@ -91,10 +94,6 @@ export default function Dashboard() {
   const balancePct = resumen && resumen.ingresos > 0
     ? Math.max(0, Math.min(100, (resumen.balance / resumen.ingresos) * 100))
     : 0;
-  const gastosPct = resumen && resumen.ingresos > 0
-    ? Math.min(100, (resumen.total_gastos / resumen.ingresos) * 100)
-    : 0;
-
   // Fila de presupuesto: usado vs. asignado (budget = sueldo × %).
   function renderBudgetRow(label: string, color: string, used: number, budget: number) {
     const pct = budget > 0 ? (used / budget) * 100 : 0;
@@ -146,6 +145,13 @@ export default function Dashboard() {
             USD ${resumen.dolar_rate.toLocaleString("es-AR")}
           </span>
         )}
+
+        <button className="btn-ghost" style={{ marginLeft: "auto" }} onClick={() => setShowImport(true)} title="Importar resumen de tarjeta">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+          </svg>
+          Importar resumen
+        </button>
       </div>
 
       {/* Loading / error */}
@@ -439,6 +445,15 @@ export default function Dashboard() {
             </Card>
           )}
         </>
+      )}
+
+      {showImport && (
+        <ImportResumen
+          anio={anio}
+          mes={mes}
+          onClose={() => setShowImport(false)}
+          onApplied={() => setRefreshKey((k) => k + 1)}
+        />
       )}
     </div>
   );

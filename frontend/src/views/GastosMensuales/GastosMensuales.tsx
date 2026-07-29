@@ -363,9 +363,6 @@ export default function GastosMensuales() {
         <ImportResumen
           anio={anio}
           mes={mes}
-          gastos={items}
-          tarjetas={tarjetas}
-          categorias={categorias}
           onClose={() => setShowImport(false)}
           onApplied={load}
         />

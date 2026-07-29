@@ -54,6 +54,8 @@
 .ir-desc { flex: 1; min-width: 120px; color: var(--text-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ir-amount { font-variant-numeric: tabular-nums; font-weight: var(--font-semibold); color: var(--text-primary); }
 .ir-fix { display: inline-flex; align-items: center; gap: 5px; font-size: var(--text-xs); color: var(--warning); width: 100%; margin-left: 26px; }
+.ir-tag { font-size: var(--text-xs); color: var(--accent); }
+.ir-tag--warn { color: var(--warning); }
 
 .ir-footer {
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-4);

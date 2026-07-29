@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { gastosApi, type GastoMensual, type GastoMensualCreate, type Categoria, type Tarjeta } from "../api_client";
+import {
+  gastosApi, fijosApi, cuotasApi, tarjetasApi, categoriasApi,
+  type GastoMensual, type GastoMensualCreate, type GastoFijo, type Cuota, type Categoria, type Tarjeta,
+} from "../api_client";
 import { Modal } from "./Modal";
 import type { StmtTx, ParsedStatement } from "../lib/galiciaParser";
 import "./ImportResumen.css";
@@ -7,9 +10,6 @@ import "./ImportResumen.css";
 interface Props {
   anio: number;
   mes: number;
-  gastos: GastoMensual[];
-  tarjetas: Tarjeta[];
-  categorias: Categoria[];
   onClose: () => void;
   onApplied: () => void;
 }
@@ -19,17 +19,35 @@ function fmt(n: number, moneda: string) {
   return n.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
 }
 function fmtFecha(iso: string) { const [, m, d] = iso.split("-"); return `${d}/${m}`; }
+const near = (a: number, b: number) => Math.abs(a - b) < 0.5;
 
-export default function ImportResumen({ anio, mes, gastos, tarjetas, categorias, onClose, onApplied }: Props) {
+export default function ImportResumen({ anio, mes, onClose, onApplied }: Props) {
   const [step, setStep] = useState<"pick" | "parsing" | "review">("pick");
   const [parsed, setParsed] = useState<ParsedStatement | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
 
+  // Datos del mes (los busca solo, para cruzar contra las 3 secciones).
+  const [gastos, setGastos] = useState<GastoMensual[]>([]);
+  const [fijos, setFijos] = useState<GastoFijo[]>([]);
+  const [cuotas, setCuotas] = useState<Cuota[]>([]);
+  const [tarjetas, setTarjetas] = useState<Tarjeta[]>([]);
+  const [categorias, setCategorias] = useState<Categoria[]>([]);
+
   const [addSet, setAddSet] = useState<Set<number>>(new Set());
   const [fixSet, setFixSet] = useState<Set<number>>(new Set());
   const [categoria, setCategoria] = useState("Otros");
   const [tarjetaId, setTarjetaId] = useState<number | null>(null);
+
+  useEffect(() => {
+    Promise.all([
+      gastosApi.list(anio, mes), fijosApi.list(anio, mes), cuotasApi.list(),
+      tarjetasApi.list(), categoriasApi.list(),
+    ]).then(([g, f, c, t, cats]) => {
+      setGastos(g); setFijos(f); setCuotas(c); setTarjetas(t); setCategorias(cats);
+      setCategoria(cats.some((x) => x.nombre === "Otros") ? "Otros" : (cats[0]?.nombre ?? "Otros"));
+    }).catch((e) => setError((e as Error).message));
+  }, [anio, mes]);
 
   async function handleFile(file: File) {
     setStep("parsing");
@@ -37,20 +55,17 @@ export default function ImportResumen({ anio, mes, gastos, tarjetas, categorias,
     try {
       const { extractPdfLines } = await import("../lib/pdfText");
       const { parseGaliciaStatement } = await import("../lib/galiciaParser");
-      const lines = await extractPdfLines(file);
-      const res = parseGaliciaStatement(lines);
+      const res = parseGaliciaStatement(await extractPdfLines(file));
       if (res.transacciones.length === 0) {
         setError("No se detectaron consumos en el PDF. ¿Es un resumen de Galicia?");
         setStep("pick");
         return;
       }
       setParsed(res);
-      // Adivinar la tarjeta del usuario según la marca detectada.
       const guess = tarjetas.find((t) =>
         res.tarjeta && (t.nombre.toUpperCase().includes(res.tarjeta) || t.tipo.toUpperCase().includes(res.tarjeta.slice(0, 4)))
       );
       setTarjetaId(guess?.id ?? null);
-      setCategoria(categorias.some((c) => c.nombre === "Otros") ? "Otros" : (categorias[0]?.nombre ?? "Otros"));
       setStep("review");
     } catch (e) {
       setError("No pude leer el PDF: " + (e as Error).message);
@@ -58,34 +73,47 @@ export default function ImportResumen({ anio, mes, gastos, tarjetas, categorias,
     }
   }
 
-  // Matching: cada compra del resumen contra los gastos ya cargados (por monto+moneda).
+  // Cruce contra las 3 secciones.
   const recon = useMemo(() => {
     const compras = (parsed?.transacciones ?? []).filter((t) => t.tipo === "compra");
-    const cuotas  = (parsed?.transacciones ?? []).filter((t) => t.tipo === "cuota");
-    const used = new Set<number>();
-    const coincidencias: { tx: StmtTx; gasto: GastoMensual }[] = [];
-    const faltantes: StmtTx[] = [];
-    for (const tx of compras) {
-      const g = gastos.find((g) => !used.has(g.id) && g.moneda === tx.moneda && Math.abs(g.monto - tx.monto) < 0.5);
-      if (g) { used.add(g.id); coincidencias.push({ tx, gasto: g }); }
-      else faltantes.push(tx);
-    }
-    return { compras, cuotas, coincidencias, faltantes, usedIds: used };
-  }, [parsed, gastos]);
+    const cuotasTx = (parsed?.transacciones ?? []).filter((t) => t.tipo === "cuota");
 
-  // Inicializar selecciones cuando se parsea un resumen nuevo.
+    const usedG = new Set<number>();
+    const usedF = new Set<number>();
+    const enFijos: { tx: StmtTx; fijo: GastoFijo }[] = [];
+    const enGastos: { tx: StmtTx; gasto: GastoMensual }[] = [];
+    const faltantes: StmtTx[] = [];
+
+    for (const tx of compras) {
+      const fijo = fijos.find((f) => !usedF.has(f.id) && f.moneda === tx.moneda && near(f.monto, tx.monto));
+      if (fijo) { usedF.add(fijo.id); enFijos.push({ tx, fijo }); continue; }
+      const g = gastos.find((g) => !usedG.has(g.id) && g.moneda === tx.moneda && near(g.monto, tx.monto));
+      if (g) { usedG.add(g.id); enGastos.push({ tx, gasto: g }); continue; }
+      faltantes.push(tx);
+    }
+
+    const usedC = new Set<number>();
+    const cuotasOk: { tx: StmtTx; cuota: Cuota }[] = [];
+    const cuotasFalt: StmtTx[] = [];
+    for (const tx of cuotasTx) {
+      const c = cuotas.find((c) => !usedC.has(c.id) && c.moneda === tx.moneda && near(c.monto_cuota, tx.monto));
+      if (c) { usedC.add(c.id); cuotasOk.push({ tx, cuota: c }); }
+      else cuotasFalt.push(tx);
+    }
+
+    return { compras, enFijos, enGastos, faltantes, cuotasOk, cuotasFalt, usedG };
+  }, [parsed, gastos, fijos, cuotas]);
+
   useEffect(() => {
     if (!parsed) return;
     setAddSet(new Set(recon.faltantes.map((_, i) => i)));
-    setFixSet(new Set(recon.coincidencias.map((_, i) => i).filter((i) => recon.coincidencias[i].gasto.fecha !== recon.coincidencias[i].tx.fecha)));
+    setFixSet(new Set(recon.enGastos.map((_, i) => i).filter((i) => recon.enGastos[i].gasto.fecha !== recon.enGastos[i].tx.fecha)));
   }, [parsed]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const sobrantes = gastos.filter((g) => g.tarjeta_id === tarjetaId && tarjetaId !== null && !recon.usedIds.has(g.id));
+  const sobrantes = gastos.filter((g) => g.tarjeta_id === tarjetaId && tarjetaId !== null && !recon.usedG.has(g.id));
 
   function toggle(set: Set<number>, setter: (s: Set<number>) => void, i: number) {
-    const n = new Set(set);
-    n.has(i) ? n.delete(i) : n.add(i);
-    setter(n);
+    const n = new Set(set); n.has(i) ? n.delete(i) : n.add(i); setter(n);
   }
 
   async function apply() {
@@ -100,13 +128,13 @@ export default function ImportResumen({ anio, mes, gastos, tarjetas, categorias,
         }));
       await gastosApi.createMany(toAdd);
 
-      for (let i = 0; i < recon.coincidencias.length; i++) {
-        const c = recon.coincidencias[i];
+      for (let i = 0; i < recon.enGastos.length; i++) {
+        const c = recon.enGastos[i];
         if (fixSet.has(i) && c.gasto.fecha !== c.tx.fecha) {
           await gastosApi.update(c.gasto.id, { fecha: c.tx.fecha });
         }
       }
-      await gastosApi.marcarVerificados(recon.coincidencias.map((c) => c.gasto.id));
+      await gastosApi.marcarVerificados(recon.enGastos.map((c) => c.gasto.id));
 
       onApplied();
       onClose();
@@ -116,8 +144,7 @@ export default function ImportResumen({ anio, mes, gastos, tarjetas, categorias,
     }
   }
 
-  const totalResumen = recon.compras.reduce((s, t) => s + (t.moneda === "ARS" ? t.monto : 0), 0);
-  const totalCargado = recon.coincidencias.reduce((s, c) => s + (c.tx.moneda === "ARS" ? c.tx.monto : 0), 0);
+  const okCount = recon.enFijos.length + recon.enGastos.length + recon.cuotasOk.length;
 
   return (
     <Modal title="Importar resumen de tarjeta" size="lg" onClose={onClose}>
@@ -127,7 +154,8 @@ export default function ImportResumen({ anio, mes, gastos, tarjetas, categorias,
         <div className="ir-pick">
           <p className="ir-hint">
             Elegí el PDF del resumen de tu tarjeta Galicia (Visa o Mastercard). Se lee en tu
-            dispositivo, no se sube a ningún lado. Vas a poder revisar antes de aplicar nada.
+            dispositivo, no se sube a ningún lado. Cruza contra <b>Gastos</b>, <b>Fijos</b> y
+            <b> Cuotas</b>, y podés revisar antes de aplicar nada.
           </p>
           <label className="ir-drop">
             <input type="file" accept="application/pdf,.pdf" style={{ display: "none" }}
@@ -146,7 +174,6 @@ export default function ImportResumen({ anio, mes, gastos, tarjetas, categorias,
 
       {step === "review" && parsed && (
         <div className="ir-review">
-          {/* Encabezado: tarjeta + categoría para nuevos */}
           <div className="ir-controls">
             <div className="ir-badge">Detectado: <b>{parsed.tarjeta ?? "—"}</b></div>
             <label className="ir-ctrl">
@@ -164,10 +191,10 @@ export default function ImportResumen({ anio, mes, gastos, tarjetas, categorias,
             </label>
           </div>
 
-          {/* Faltantes */}
+          {/* Faltantes → agregar a Gastos */}
           <section className="ir-sec">
-            <h4 className="ir-sec__title ir-add">➕ Faltantes — agregar ({recon.faltantes.length})</h4>
-            {recon.faltantes.length === 0 ? <p className="ir-empty">Nada para agregar, ya está todo cargado 🎉</p> : (
+            <h4 className="ir-sec__title ir-add">➕ Faltan en la app — agregar a Gastos ({recon.faltantes.length})</h4>
+            {recon.faltantes.length === 0 ? <p className="ir-empty">Nada para agregar, está todo cargado 🎉</p> : (
               <ul className="ir-list">
                 {recon.faltantes.map((tx, i) => (
                   <li key={i} className="ir-row">
@@ -181,16 +208,30 @@ export default function ImportResumen({ anio, mes, gastos, tarjetas, categorias,
             )}
           </section>
 
-          {/* Coincidencias */}
-          <section className="ir-sec">
-            <h4 className="ir-sec__title ir-ok">✅ Coincidencias — ya cargadas ({recon.coincidencias.length})</h4>
-            {recon.coincidencias.length === 0 ? <p className="ir-empty">—</p> : (
+          {/* Ya en Fijos */}
+          {recon.enFijos.length > 0 && (
+            <section className="ir-sec">
+              <h4 className="ir-sec__title ir-ok">✅ Ya en Gastos Fijos ({recon.enFijos.length})</h4>
               <ul className="ir-list">
-                {recon.coincidencias.map((c, i) => {
+                {recon.enFijos.map((c, i) => (
+                  <li key={i} className="ir-row"><span className="ir-check">✓</span>
+                    <span className="ir-desc">{c.tx.descripcion} <span className="ir-tag">→ {c.fijo.nombre}</span></span>
+                    <span className="ir-amount">{fmt(c.tx.monto, c.tx.moneda)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* Ya en Gastos */}
+          {recon.enGastos.length > 0 && (
+            <section className="ir-sec">
+              <h4 className="ir-sec__title ir-ok">✅ Ya en Gastos ({recon.enGastos.length})</h4>
+              <ul className="ir-list">
+                {recon.enGastos.map((c, i) => {
                   const diff = c.gasto.fecha !== c.tx.fecha;
                   return (
-                    <li key={i} className="ir-row">
-                      <span className="ir-check">✓</span>
+                    <li key={i} className="ir-row"><span className="ir-check">✓</span>
                       <span className="ir-desc">{c.gasto.nombre}</span>
                       <span className="ir-amount">{fmt(c.tx.monto, c.tx.moneda)}</span>
                       {diff && (
@@ -203,8 +244,31 @@ export default function ImportResumen({ anio, mes, gastos, tarjetas, categorias,
                   );
                 })}
               </ul>
-            )}
-          </section>
+            </section>
+          )}
+
+          {/* Cuotas */}
+          {(recon.cuotasOk.length > 0 || recon.cuotasFalt.length > 0) && (
+            <section className="ir-sec">
+              <h4 className="ir-sec__title">🧾 Cuotas del resumen ({recon.cuotasOk.length + recon.cuotasFalt.length})</h4>
+              <ul className="ir-list">
+                {recon.cuotasOk.map((c, i) => (
+                  <li key={"ok" + i} className="ir-row"><span className="ir-check">✓</span>
+                    <span className="ir-date">{c.tx.cuota}</span>
+                    <span className="ir-desc">{c.tx.descripcion} <span className="ir-tag">→ {c.cuota.nombre}</span></span>
+                    <span className="ir-amount">{fmt(c.tx.monto, c.tx.moneda)}</span>
+                  </li>
+                ))}
+                {recon.cuotasFalt.map((t, i) => (
+                  <li key={"f" + i} className="ir-row"><span style={{ color: "var(--warning)" }}>⚠️</span>
+                    <span className="ir-date">{t.cuota}</span>
+                    <span className="ir-desc">{t.descripcion} <span className="ir-tag ir-tag--warn">no registrada en Cuotas</span></span>
+                    <span className="ir-amount">{fmt(t.monto, t.moneda)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           {/* Sobrantes */}
           {sobrantes.length > 0 && (
@@ -221,27 +285,9 @@ export default function ImportResumen({ anio, mes, gastos, tarjetas, categorias,
             </section>
           )}
 
-          {/* Cuotas (informativo) */}
-          {recon.cuotas.length > 0 && (
-            <section className="ir-sec">
-              <h4 className="ir-sec__title">🧾 Cuotas en el resumen ({recon.cuotas.length}) — verificá que estén en la sección Cuotas</h4>
-              <ul className="ir-list">
-                {recon.cuotas.map((t, i) => (
-                  <li key={i} className="ir-row ir-muted">
-                    <span className="ir-date">{t.cuota}</span>
-                    <span className="ir-desc">{t.descripcion}</span>
-                    <span className="ir-amount">{fmt(t.monto, t.moneda)}</span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-          )}
-
-          {/* Totales + aplicar */}
           <div className="ir-footer">
             <div className="ir-totals">
-              <span>Compras resumen (ARS): <b>{fmt(totalResumen, "ARS")}</b></span>
-              <span>Ya cargado (ARS): <b>{fmt(totalCargado, "ARS")}</b></span>
+              <span>{okCount} ya cargados · {recon.faltantes.length} faltan</span>
             </div>
             <button className="btn-primary" onClick={apply} disabled={applying}>
               {applying ? "Aplicando..." : `Aplicar (${addSet.size} nuevos)`}
