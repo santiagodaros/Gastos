@@ -14,7 +14,9 @@
     left: 0;
     right: 0;
     bottom: 0;
-    height: 60px;
+    /* 60px de barra + el safe-area del home indicator ABAJO (no adentro),
+       si no el padding se comía la altura y cortaba íconos/labels. */
+    height: calc(60px + env(safe-area-inset-bottom, 0px));
     padding-bottom: env(safe-area-inset-bottom, 0px);
     background: var(--bg-surface);
     border-top: 1px solid var(--border);
