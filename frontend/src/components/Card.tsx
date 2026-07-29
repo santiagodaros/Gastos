@@ -23,7 +23,7 @@ export function Card({ variant = "default", className = "", children }: CardProp
 
 interface MetricCardProps {
   label: string;
-  value: string;
+  value: React.ReactNode;
   valueColor?: ValueColor;
   icon: React.ReactNode;
   footer?: string;

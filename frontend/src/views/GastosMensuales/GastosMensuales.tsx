@@ -5,6 +5,7 @@ import { Card } from "../../components/Card";
 import { Modal, ConfirmModal } from "../../components/Modal";
 import ImportResumen from "../../components/ImportResumen";
 import Lightbox from "../../components/Lightbox";
+import { useToast } from "../../components/Toast";
 import PeriodSelector from "../../components/PeriodSelector";
 import "../../styles/abm.css";
 import "./GastosMensuales.css";
@@ -43,6 +44,7 @@ function fmtFecha(iso?: string | null) {
 }
 
 export default function GastosMensuales() {
+  const toast = useToast();
   const now = new Date();
   const [anio, setAnio] = useState(now.getFullYear());
   const [mes, setMes]   = useState(now.getMonth() + 1);
@@ -119,13 +121,15 @@ export default function GastosMensuales() {
       }
       if (modal === "edit" && editItem) {
         await gastosApi.update(editItem.id, body);
+        toast.success("Gasto actualizado");
       } else {
         await gastosApi.create(body);
+        toast.success("Gasto agregado");
       }
       setModal(null);
       load();
     } catch (e: unknown) {
-      alert((e as Error).message);
+      toast.error((e as Error).message);
     } finally {
       setSaving(false);
     }
@@ -137,8 +141,11 @@ export default function GastosMensuales() {
     try {
       if (toDelete.comprobante_url) await comprobantesApi.remove(toDelete.comprobante_url);
       await gastosApi.delete(toDelete.id);
+      toast.success("Gasto eliminado");
       setToDelete(null);
       load();
+    } catch (e: unknown) {
+      toast.error((e as Error).message);
     } finally {
       setDeleting(false);
     }

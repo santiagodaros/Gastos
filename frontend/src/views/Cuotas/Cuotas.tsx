@@ -3,6 +3,7 @@ import { cuotasApi, tarjetasApi, proyeccionApi, categoriasApi, comprobantesApi, 
 import { Card, MetricCard } from "../../components/Card";
 import { Modal, ConfirmModal } from "../../components/Modal";
 import Lightbox from "../../components/Lightbox";
+import { useToast } from "../../components/Toast";
 import BarChart, { type BarChartBar } from "../../components/BarChart";
 import "../../styles/abm.css";
 
@@ -32,6 +33,7 @@ const EMPTY_FORM: CuotaCreate = {
 type Tab = "lista" | "proyeccion";
 
 export default function Cuotas() {
+  const toast = useToast();
   const [tab, setTab] = useState<Tab>("lista");
 
   // — Lista —
@@ -96,18 +98,19 @@ export default function Cuotas() {
       } else if (modal === "edit" && editItem?.comprobante_url && !form.comprobante_url) {
         await comprobantesApi.remove(editItem.comprobante_url);
       }
-      if (modal === "edit" && editItem) await cuotasApi.update(editItem.id, body);
-      else await cuotasApi.create(body);
+      if (modal === "edit" && editItem) { await cuotasApi.update(editItem.id, body); toast.success("Cuota actualizada"); }
+      else { await cuotasApi.create(body); toast.success("Cuota agregada"); }
       setModal(null); load();
-    } catch (e: unknown) { alert((e as Error).message); }
+    } catch (e: unknown) { toast.error((e as Error).message); }
     finally { setSaving(false); }
   }
   async function handleDelete() {
     if (!toDelete) return; setDeleting(true);
     try {
       if (toDelete.comprobante_url) await comprobantesApi.remove(toDelete.comprobante_url);
-      await cuotasApi.delete(toDelete.id); setToDelete(null); load();
+      await cuotasApi.delete(toDelete.id); toast.success("Cuota eliminada"); setToDelete(null); load();
     }
+    catch (e: unknown) { toast.error((e as Error).message); }
     finally { setDeleting(false); }
   }
   function tarjetaNombre(id: number | null) {

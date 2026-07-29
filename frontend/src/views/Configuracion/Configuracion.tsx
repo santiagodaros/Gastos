@@ -7,16 +7,18 @@ import {
 } from "../../api_client";
 import { Card } from "../../components/Card";
 import { Modal, ConfirmModal } from "../../components/Modal";
+import { useToast } from "../../components/Toast";
 import "../../styles/abm.css";
 
 // ─── Constantes ───────────────────────────────────────────────────────────────
 
 const TIPOS_TARJETA = ["Crédito", "Débito", "Prepaga"];
 
+// Paleta curada: misma saturación/luminosidad → los gráficos leen como un sistema.
 const COLORS = [
-  "#ef4444", "#f97316", "#f59e0b", "#eab308",
-  "#84cc16", "#10b981", "#06b6d4", "#3b82f6",
-  "#6366f1", "#8b5cf6", "#ec4899", "#6b7280",
+  "#4c6ef5", "#15aabf", "#12b886", "#82c91e",
+  "#fab005", "#fd7e14", "#fa5252", "#e64980",
+  "#be4bdb", "#7048e8", "#20c997", "#868e96",
 ];
 
 const EMPTY_TARJETA: TarjetaCreate = { nombre: "", tipo: "Crédito", ultimos_4: "", activa: 1 };
@@ -62,6 +64,7 @@ const TrashIcon = () => (
 // ─── Componente principal ─────────────────────────────────────────────────────
 
 export default function Configuracion() {
+  const toast = useToast();
   const [tab, setTab] = useState<Tab>("tarjetas");
 
   // ── Tarjetas state ──
@@ -108,8 +111,8 @@ export default function Configuracion() {
 
   async function handlePSubmit(e: React.FormEvent) {
     e.preventDefault(); setPSaving(true); setPSaved(false);
-    try { await presupuestoApi.upsert(presu); setPSaved(true); }
-    catch (err: unknown) { alert((err as Error).message); }
+    try { await presupuestoApi.upsert(presu); setPSaved(true); toast.success("Presupuesto guardado"); }
+    catch (err: unknown) { toast.error((err as Error).message); }
     finally { setPSaving(false); }
   }
 
@@ -119,8 +122,9 @@ export default function Configuracion() {
     try {
       if (tModal === "edit" && tEditItem) await tarjetasApi.update(tEditItem.id, tForm);
       else await tarjetasApi.create(tForm);
+      toast.success("Tarjeta guardada");
       setTModal(null); loadTarjetas();
-    } catch (err: unknown) { alert((err as Error).message); }
+    } catch (err: unknown) { toast.error((err as Error).message); }
     finally { setTSaving(false); }
   }
   async function handleTDelete() {
@@ -135,8 +139,9 @@ export default function Configuracion() {
     try {
       if (cModal === "edit" && cEditItem) await categoriasApi.update(cEditItem.id, cForm);
       else await categoriasApi.create(cForm);
+      toast.success("Categoría guardada");
       setCModal(null); loadCats();
-    } catch (err: unknown) { alert((err as Error).message); }
+    } catch (err: unknown) { toast.error((err as Error).message); }
     finally { setCSaving(false); }
   }
   async function handleCDelete() {

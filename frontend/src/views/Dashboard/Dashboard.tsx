@@ -4,6 +4,9 @@ import { MetricCard } from "../../components/Card";
 import { Card } from "../../components/Card";
 import DonutChart, { type DonutSlice } from "../../components/DonutChart";
 import ImportResumen from "../../components/ImportResumen";
+import BudgetRing from "../../components/BudgetRing";
+import CountUp from "../../components/CountUp";
+import { Skeleton } from "../../components/Skeleton";
 import "../../styles/abm.css";
 import "./Dashboard.css";
 
@@ -154,12 +157,34 @@ export default function Dashboard() {
         </button>
       </div>
 
-      {/* Loading / error */}
+      {/* Loading → skeletons */}
       {loading && (
-        <div className="dashboard__loading">
-          <div className="spinner" />
-          <span>Cargando datos...</span>
-        </div>
+        <>
+          <Card>
+            <div className="dashboard__hero-inner">
+              <Skeleton width={200} height={200} radius="50%" />
+              <div className="dashboard__hero-stats">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-4)" }}>
+                    <Skeleton width={80} height={13} />
+                    <Skeleton width={90} height={13} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </Card>
+          <div className="dashboard__metrics">
+            {[0, 1, 2, 3].map((i) => (
+              <Card key={i}>
+                <div className="metric-card">
+                  <Skeleton width={70} height={12} />
+                  <Skeleton width={110} height={30} radius={10} />
+                  <Skeleton width={90} height={12} />
+                </div>
+              </Card>
+            ))}
+          </div>
+        </>
       )}
 
       {error && !loading && (
@@ -175,11 +200,43 @@ export default function Dashboard() {
 
       {!loading && resumen && (
         <>
+          {/* Hero: anillo del mes */}
+          {(() => {
+            const base = resumen.sueldo > 0 ? resumen.sueldo : resumen.ingresos;
+            if (base <= 0) return null;
+            const rows: { label: string; value: number; color: string }[] = [
+              { label: "Ingresos", value: resumen.ingresos, color: "var(--positive)" },
+              { label: "Gastos", value: resumen.total_gastos, color: "var(--negative)" },
+              { label: "Cuotas", value: resumen.cuotas, color: "var(--warning)" },
+              { label: "Balance", value: resumen.balance, color: resumen.balance >= 0 ? "var(--positive)" : "var(--negative)" },
+            ];
+            return (
+              <Card className="dashboard__hero">
+                <div className="dashboard__hero-inner">
+                  <BudgetRing used={resumen.total_gastos} budget={base} fmt={fmt} />
+                  <div className="dashboard__hero-stats">
+                    <p className="dashboard__hero-title">
+                      {resumen.sueldo > 0 ? "Gastado del sueldo" : "Gastado de tus ingresos"} este mes
+                    </p>
+                    {rows.map((r) => (
+                      <div key={r.label} className="dashboard__hero-row">
+                        <span className="dashboard__hero-row-label">{r.label}</span>
+                        <span className="dashboard__hero-row-value" style={{ color: r.color }}>
+                          <CountUp value={r.value} format={fmt} />
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </Card>
+            );
+          })()}
+
           {/* Metric cards */}
           <div className="dashboard__metrics">
             <MetricCard
               label="Ingresos"
-              value={fmtShort(resumen.ingresos)}
+              value={<CountUp value={resumen.ingresos} format={fmtShort} />}
               valueColor="positive"
               variant="positive"
               icon={
@@ -193,7 +250,7 @@ export default function Dashboard() {
 
             <MetricCard
               label="Total Gastos"
-              value={fmtShort(resumen.total_gastos)}
+              value={<CountUp value={resumen.total_gastos} format={fmtShort} />}
               valueColor="negative"
               variant="negative"
               icon={
@@ -207,7 +264,7 @@ export default function Dashboard() {
 
             <MetricCard
               label="Balance"
-              value={fmtShort(resumen.balance)}
+              value={<CountUp value={resumen.balance} format={fmtShort} />}
               valueColor={resumen.balance >= 0 ? "positive" : "negative"}
               variant={resumen.balance >= 0 ? "positive" : "negative"}
               icon={
@@ -226,7 +283,7 @@ export default function Dashboard() {
 
             <MetricCard
               label="Cuotas"
-              value={fmtShort(resumen.cuotas)}
+              value={<CountUp value={resumen.cuotas} format={fmtShort} />}
               valueColor="warning"
               variant="warning"
               icon={

@@ -81,7 +81,7 @@ export default function Layout({ children }: LayoutProps) {
         </header>
 
         <main className="layout__main">
-          <div key={`${activeView}-${refreshKey}`}>
+          <div className="view-fade" key={`${activeView}-${refreshKey}`}>
             {children(activeView)}
           </div>
         </main>

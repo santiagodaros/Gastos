@@ -9,7 +9,7 @@
   border-radius: var(--radius-lg);
   padding: var(--space-6);
   overflow: hidden;
-  transition: border-color var(--transition-base), box-shadow var(--transition-base);
+  transition: border-color var(--transition-base), box-shadow var(--transition-base), transform var(--transition-base);
 }
 
 @media (max-width: 767px) {
@@ -31,6 +31,12 @@
 .card:hover {
   border-color: var(--border-strong);
   box-shadow: var(--shadow);
+}
+
+/* Lift sutil solo en las tarjetas de métrica (no en las que contienen tablas). */
+.card:has(.metric-card):hover {
+  transform: translateY(-3px);
+  box-shadow: var(--shadow-lg);
 }
 
 /* Variantes */

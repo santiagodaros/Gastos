@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { metasApi, type MetaAhorro, type MetaAhorroCreate } from "../../api_client";
 import { Card } from "../../components/Card";
 import { Modal, ConfirmModal } from "../../components/Modal";
+import { useToast } from "../../components/Toast";
 import "../../styles/abm.css";
 import "./Metas.css";
 
@@ -49,6 +50,7 @@ const EMPTY_FORM: MetaAhorroCreate = {
 };
 
 export default function Metas() {
+  const toast = useToast();
   const [items, setItems]       = useState<MetaAhorro[]>([]);
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
@@ -103,13 +105,15 @@ export default function Metas() {
     try {
       if (modal === "edit" && editItem) {
         await metasApi.update(editItem.id, form);
+        toast.success("Guardado");
       } else if (modal === "add") {
         await metasApi.create(form);
+        toast.success(form.tipo === "inversion" ? "Inversión creada" : "Meta creada");
       }
       setModal(null);
       load();
     } catch (e: unknown) {
-      alert((e as Error).message);
+      toast.error((e as Error).message);
     } finally {
       setSaving(false);
     }
@@ -121,10 +125,11 @@ export default function Metas() {
     setSaving(true);
     try {
       await metasApi.depositar(editItem.id, deposito);
+      toast.success("Depósito registrado");
       setModal(null);
       load();
     } catch (e: unknown) {
-      alert((e as Error).message);
+      toast.error((e as Error).message);
     } finally {
       setSaving(false);
     }
@@ -135,8 +140,11 @@ export default function Metas() {
     setDeleting(true);
     try {
       await metasApi.delete(toDelete.id);
+      toast.success("Eliminada");
       setToDelete(null);
       load();
+    } catch (e: unknown) {
+      toast.error((e as Error).message);
     } finally {
       setDeleting(false);
     }
