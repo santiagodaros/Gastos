@@ -8,6 +8,15 @@
   gap: var(--space-8);
 }
 
+@media (max-width: 767px) {
+  .donut-chart {
+    flex-direction: column;
+    gap: var(--space-5);
+    align-items: center;
+  }
+  .donut-chart__legend { width: 100%; }
+}
+
 .donut-chart__svg-wrapper {
   position: relative;
   flex-shrink: 0;

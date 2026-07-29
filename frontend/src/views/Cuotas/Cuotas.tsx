@@ -30,7 +30,7 @@ const EMPTY_FORM: CuotaCreate = {
   activa: 1, moneda: "ARS", tarjeta_id: null, categoria: "Sin categoría", nota: null, comprobante_url: null,
 };
 
-type Tab = "lista" | "proyeccion";
+type Tab = "lista" | "proyeccion" | "tarjetas";
 
 export default function Cuotas() {
   const toast = useToast();
@@ -150,7 +150,7 @@ export default function Cuotas() {
     <div className="abm">
       {/* Tabs */}
       <div style={{ display: "flex", gap: "0.25rem", marginBottom: "1rem", borderBottom: "1px solid var(--border)", paddingBottom: "0.75rem" }}>
-        {(["lista", "proyeccion"] as Tab[]).map((t) => (
+        {(["lista", "tarjetas", "proyeccion"] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
@@ -166,7 +166,7 @@ export default function Cuotas() {
               transition: "all 0.15s",
             }}
           >
-            {t === "lista" ? "Cuotas" : "Proyección"}
+            {t === "lista" ? "Cuotas" : t === "tarjetas" ? "Por tarjeta" : "Proyección"}
           </button>
         ))}
       </div>
@@ -281,6 +281,65 @@ export default function Cuotas() {
             )}
           </Card>
         </>
+      )}
+
+      {/* ── TAB: POR TARJETA ── */}
+      {tab === "tarjetas" && (
+        loading ? (
+          <div className="abm-loading"><div className="spinner" /></div>
+        ) : (() => {
+          const curY = now.getFullYear(), curM = now.getMonth() + 1;
+          const enMesActual = (c: Cuota) => {
+            const n = c.cuota_actual + (curY - c.anio_inicio) * 12 + (curM - c.mes_inicio);
+            return n >= 1 && n <= c.total_cuotas;
+          };
+          const activasVig = items.filter((c) => c.activa && !isFinished(c));
+          const grupos = new Map<number | null, Cuota[]>();
+          for (const c of activasVig) {
+            const k = c.tarjeta_id ?? null;
+            if (!grupos.has(k)) grupos.set(k, []);
+            grupos.get(k)!.push(c);
+          }
+          if (grupos.size === 0) return <Card><div className="abm-empty">Sin cuotas activas</div></Card>;
+          const nombreTarjeta = (id: number | null) => {
+            if (id == null) return "Efectivo / Débito";
+            const t = tarjetas.find((x) => x.id === id);
+            return t ? `${t.nombre} ···${t.ultimos_4}` : "Tarjeta";
+          };
+          return (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1rem" }}>
+              {[...grupos.entries()].map(([tid, cs]) => {
+                const mesArs = cs.filter((c) => enMesActual(c) && c.moneda === "ARS").reduce((s, c) => s + c.monto_cuota, 0);
+                const mesUsd = cs.filter((c) => enMesActual(c) && c.moneda === "USD").reduce((s, c) => s + c.monto_cuota, 0);
+                return (
+                  <Card key={String(tid)}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "var(--space-3)" }}>
+                      <span style={{ fontWeight: "var(--font-semibold)", color: "var(--text-primary)" }}>💳 {nombreTarjeta(tid)}</span>
+                      <span className="badge badge--neutral">{cs.length} cuota{cs.length !== 1 ? "s" : ""}</span>
+                    </div>
+                    <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: 2 }}>Este mes</div>
+                    <div style={{ fontSize: "var(--text-xl)", fontWeight: "var(--font-bold)", color: "var(--warning)", marginBottom: "var(--space-4)" }}>
+                      {fmt(mesArs)}{mesUsd > 0 && <span style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)" }}> + {fmt(mesUsd, "USD")}</span>}
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)" }}>
+                      {cs.map((c) => {
+                        const n = c.cuota_actual + (curY - c.anio_inicio) * 12 + (curM - c.mes_inicio);
+                        const actual = Math.min(Math.max(n, 1), c.total_cuotas);
+                        return (
+                          <div key={c.id} style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", fontSize: "var(--text-sm)" }}>
+                            <span style={{ flex: 1, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.nombre}</span>
+                            <span style={{ color: "var(--text-muted)", fontSize: "var(--text-xs)" }}>{actual}/{c.total_cuotas}</span>
+                            <span style={{ fontWeight: "var(--font-medium)", minWidth: 80, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{fmt(c.monto_cuota, c.moneda)}</span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
+          );
+        })()
       )}
 
       {/* ── TAB: PROYECCIÓN ── */}

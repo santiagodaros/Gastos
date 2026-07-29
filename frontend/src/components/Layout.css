@@ -53,9 +53,11 @@
   padding: var(--space-8);
 }
 
-/* Transición al cambiar de vista */
+/* Transición al cambiar de vista + centrado del contenido */
 .view-fade {
   animation: view-in 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  max-width: 1200px;
+  margin: 0 auto;
 }
 @keyframes view-in {
   from { opacity: 0; transform: translateY(8px); }
