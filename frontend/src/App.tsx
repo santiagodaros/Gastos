@@ -10,6 +10,7 @@ import Cuotas from "./views/Cuotas/Cuotas";
 import Sueldos from "./views/Sueldos/Sueldos";
 import Metas from "./views/Metas/Metas";
 import Historial from "./views/Historial/Historial";
+import Documentos from "./views/Documentos/Documentos";
 import Configuracion from "./views/Configuracion/Configuracion";
 import type { ViewId } from "./components/Sidebar";
 
@@ -22,6 +23,7 @@ function renderView(view: ViewId) {
     case "sueldos":    return <Sueldos />;
     case "metas":      return <Metas />;
     case "historial":     return <Historial />;
+    case "documentos":    return <Documentos />;
     case "configuracion": return <Configuracion />;
   }
 }

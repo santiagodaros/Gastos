@@ -216,12 +216,54 @@ export const resumenApi = {
 
 const GASTO_COLS = "id, mes, anio, nombre, monto, categoria, moneda, nota, fecha, tarjeta_id, verificado, medio, comprobante_url";
 
+// Un comprobante para la galería por mes (viene de un gasto o de una cuota).
+export interface ComprobanteItem {
+  tipo: "gasto" | "cuota";
+  id: number;
+  nombre: string;
+  monto: number;
+  moneda: string;
+  mes: number;
+  anio: number;
+  path: string;
+}
+
 // Subida/lectura/borrado de comprobantes en Storage.
 export const comprobantesApi = {
   signedUrl: async (path: string): Promise<string | null> => {
     const { data, error } = await supabase.storage.from("comprobantes").createSignedUrl(path, 120);
     if (error) return null;
     return data?.signedUrl ?? null;
+  },
+
+  // Varias signed URLs de una (para galerías). Devuelve { path: url }.
+  signedUrls: async (paths: string[]): Promise<Record<string, string>> => {
+    const out: Record<string, string> = {};
+    if (!paths.length) return out;
+    const { data, error } = await supabase.storage.from("comprobantes").createSignedUrls(paths, 3600);
+    if (error) return out;
+    for (const d of data ?? []) {
+      if (d.path && d.signedUrl) out[d.path] = d.signedUrl;
+    }
+    return out;
+  },
+
+  // Todos los comprobantes cargados (gastos + cuotas), para la galería por mes.
+  listItems: async (): Promise<ComprobanteItem[]> => {
+    const [g, c] = await Promise.all([
+      supabase.from("gastos_mensuales")
+        .select("id, nombre, monto, moneda, mes, anio, comprobante_url").not("comprobante_url", "is", null),
+      supabase.from("cuotas")
+        .select("id, nombre, monto_cuota, moneda, mes_inicio, anio_inicio, comprobante_url").not("comprobante_url", "is", null),
+    ]);
+    const items: ComprobanteItem[] = [];
+    for (const x of (g.data ?? []) as any[]) {
+      items.push({ tipo: "gasto", id: x.id, nombre: x.nombre, monto: x.monto, moneda: x.moneda, mes: x.mes, anio: x.anio, path: x.comprobante_url });
+    }
+    for (const x of (c.data ?? []) as any[]) {
+      items.push({ tipo: "cuota", id: x.id, nombre: x.nombre, monto: x.monto_cuota, moneda: x.moneda, mes: x.mes_inicio, anio: x.anio_inicio, path: x.comprobante_url });
+    }
+    return items;
   },
 
   // Sube un archivo (comprime si es imagen) y devuelve su ruta en Storage.
@@ -720,6 +762,45 @@ export const notificacionesApi = {
       await supabase.from(n.ref_tabla).delete().eq("id", n.ref_id);
     }
     await supabase.from("notificaciones").delete().eq("id", n.id);
+  },
+};
+
+// ─── Resúmenes importados (por tarjeta) ───────────────────────────────────────
+
+export interface ResumenImportado {
+  id: number;
+  tarjeta: string | null;
+  tarjeta_id: number | null;
+  periodo_mes: number;
+  periodo_anio: number;
+  total_ars: number;
+  total_usd: number;
+  cant_items: number;
+  pdf_path: string | null;
+  created_at: string;
+}
+export type ResumenImportadoCreate = Omit<ResumenImportado, "id" | "created_at">;
+
+export const resumenesApi = {
+  list: async (): Promise<ResumenImportado[]> => {
+    const { data, error } = await supabase
+      .from("resumenes_importados")
+      .select("id, tarjeta, tarjeta_id, periodo_mes, periodo_anio, total_ars, total_usd, cant_items, pdf_path, created_at")
+      .order("periodo_anio", { ascending: false })
+      .order("periodo_mes", { ascending: false });
+    if (error) return []; // tabla aún sin crear → no rompe la app
+    return (data ?? []) as ResumenImportado[];
+  },
+
+  create: async (body: ResumenImportadoCreate): Promise<void> => {
+    const { error } = await supabase
+      .from("resumenes_importados").insert({ ...body, user_id: await uid() });
+    if (error) throw new Error(error.message);
+  },
+
+  delete: async (id: number, pdfPath: string | null) => {
+    if (pdfPath) await supabase.storage.from("comprobantes").remove([pdfPath]);
+    await supabase.from("resumenes_importados").delete().eq("id", id);
   },
 };
 

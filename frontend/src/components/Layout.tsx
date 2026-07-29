@@ -16,6 +16,7 @@ const VIEW_TITLES: Record<ViewId, string> = {
   sueldos:    "Sueldos",
   metas:      "Metas de Ahorro",
   historial:     "Historial",
+  documentos:    "Documentos",
   configuracion: "Configuración",
 };
 

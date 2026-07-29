@@ -1,0 +1,165 @@
+/* ============================================================
+   DOCUMENTOS — galerías de comprobantes y resúmenes
+   ============================================================ */
+
+.doc__tabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-6);
+  border-bottom: 1px solid var(--border-subtle);
+}
+.doc__tab {
+  padding: var(--space-3) var(--space-4);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  cursor: pointer;
+  transition: color var(--transition-fast), border-color var(--transition-fast);
+  margin-bottom: -1px;
+}
+.doc__tab:hover { color: var(--text-secondary); }
+.doc__tab.is-active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent);
+}
+
+.doc__loading { display: flex; justify-content: center; padding: var(--space-10); }
+.doc__empty {
+  padding: var(--space-8);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: var(--text-sm);
+  background: var(--bg-elevated);
+  border-radius: var(--radius);
+  border: 1px dashed var(--border);
+}
+
+/* --- Comprobantes por mes --- */
+.doc__month { margin-bottom: var(--space-8); }
+.doc__month-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: var(--space-4);
+}
+.doc__month-title {
+  font-size: var(--text-md);
+  font-weight: var(--font-semibold);
+  color: var(--text-primary);
+}
+.doc__month-count { font-size: var(--text-xs); color: var(--text-muted); }
+
+.doc__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: var(--space-4);
+}
+
+.doc__thumb {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+}
+.doc__thumb-img {
+  position: relative;
+  aspect-ratio: 1;
+  border-radius: var(--radius);
+  overflow: hidden;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+.doc__thumb:hover .doc__thumb-img {
+  transform: translateY(-2px);
+  border-color: var(--accent);
+}
+.doc__thumb-img img { width: 100%; height: 100%; object-fit: cover; }
+
+.doc__pdf {
+  font-size: var(--text-sm);
+  font-weight: var(--font-bold);
+  letter-spacing: 0.08em;
+  color: var(--accent);
+}
+.doc__badge {
+  position: absolute;
+  top: var(--space-2);
+  left: var(--space-2);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: var(--radius-full);
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+}
+.doc__thumb-name {
+  font-size: var(--text-xs);
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: var(--space-1);
+}
+.doc__thumb-amount {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Resúmenes por tarjeta --- */
+.doc__card-group { margin-bottom: var(--space-8); }
+.doc__res-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+.doc__res {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius);
+}
+.doc__res-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.doc__res-period { font-size: var(--text-sm); color: var(--text-primary); font-weight: var(--font-medium); }
+.doc__res-meta { font-size: var(--text-xs); color: var(--text-muted); }
+.doc__res-totals {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  font-variant-numeric: tabular-nums;
+}
+.doc__res-totals span { font-size: var(--text-sm); color: var(--text-secondary); }
+.doc__res-usd { color: var(--text-muted) !important; font-size: var(--text-xs) !important; }
+.doc__res-actions { display: flex; gap: var(--space-3); }
+.doc__link {
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: var(--text-xs);
+  cursor: pointer;
+  padding: 0;
+}
+.doc__link:hover { text-decoration: underline; }
+.doc__link--danger { color: var(--text-muted); }
+.doc__link--danger:hover { color: var(--danger, #ef4444); }
+
+@media (max-width: 767px) {
+  .doc__grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: var(--space-3); }
+  .doc__res { flex-wrap: wrap; }
+  .doc__res-actions { width: 100%; justify-content: flex-end; }
+}

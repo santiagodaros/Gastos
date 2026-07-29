@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  gastosApi, fijosApi, cuotasApi, tarjetasApi, categoriasApi,
+  gastosApi, fijosApi, cuotasApi, tarjetasApi, categoriasApi, resumenesApi, comprobantesApi,
   type GastoMensual, type GastoMensualCreate, type GastoFijo, type Cuota, type CuotaCreate, type Categoria, type Tarjeta,
 } from "../api_client";
 import { Modal } from "./Modal";
@@ -24,6 +24,7 @@ const near = (a: number, b: number) => Math.abs(a - b) < 0.5;
 export default function ImportResumen({ anio, mes, onClose, onApplied }: Props) {
   const [step, setStep] = useState<"pick" | "parsing" | "review">("pick");
   const [parsed, setParsed] = useState<ParsedStatement | null>(null);
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
 
@@ -63,6 +64,7 @@ export default function ImportResumen({ anio, mes, onClose, onApplied }: Props) 
         return;
       }
       setParsed(res);
+      setPdfFile(file);
       const guess = tarjetas.find((t) =>
         res.tarjeta && (t.nombre.toUpperCase().includes(res.tarjeta) || t.tipo.toUpperCase().includes(res.tarjeta.slice(0, 4)))
       );
@@ -156,6 +158,21 @@ export default function ImportResumen({ anio, mes, onClose, onApplied }: Props) 
         };
         await cuotasApi.create(body);
       }
+
+      // Guardar el resumen importado (PDF + totales) para verlo después por tarjeta.
+      try {
+        const txs = parsed?.transacciones ?? [];
+        const totalArs = txs.filter((t) => t.moneda !== "USD").reduce((s, t) => s + t.monto, 0);
+        const totalUsd = txs.filter((t) => t.moneda === "USD").reduce((s, t) => s + t.monto, 0);
+        const pdfPath = pdfFile ? await comprobantesApi.upload(pdfFile) : null;
+        await resumenesApi.create({
+          tarjeta: parsed?.tarjeta ?? tarjetas.find((t) => t.id === tarjetaId)?.nombre ?? null,
+          tarjeta_id: tarjetaId,
+          periodo_mes: mes, periodo_anio: anio,
+          total_ars: totalArs, total_usd: totalUsd, cant_items: txs.length,
+          pdf_path: pdfPath,
+        });
+      } catch { /* si falla el guardado del resumen, no bloquea la conciliación */ }
 
       onApplied();
       onClose();

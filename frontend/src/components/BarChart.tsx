@@ -27,7 +27,6 @@ export default function BarChart({
   data,
   height = 220,
   formatValue = fmtAxisY,
-  color = "var(--accent)",
   onBarClick,
   activeIndex = null,
 }: BarChartProps) {
@@ -170,7 +169,7 @@ export default function BarChart({
                 height={chartH}
                 fill="transparent"
                 style={{ cursor: onBarClick ? "pointer" : "default" }}
-                onMouseEnter={(e) => {
+                onMouseEnter={() => {
                   const svg = svgRef.current;
                   if (!svg) return;
                   const rect = svg.getBoundingClientRect();
