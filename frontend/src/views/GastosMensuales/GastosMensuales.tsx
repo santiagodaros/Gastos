@@ -310,12 +310,14 @@ export default function GastosMensuales() {
                 <input
                   className="form__input"
                   type="number"
-                  min={0}
                   step="0.01"
                   value={form.monto || ""}
                   onChange={(e) => setForm({ ...form, monto: parseFloat(e.target.value) || 0 })}
                   required
                 />
+                <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 }}>
+                  Podés poner un monto negativo (ej: −5000) para descontar.
+                </span>
               </div>
               <div className="form__field">
                 <label className="form__label">Moneda</label>
