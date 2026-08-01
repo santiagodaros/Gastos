@@ -118,7 +118,6 @@
 
   .layout__main {
     padding: var(--space-4);
-    /* espacio para que la bottom-nav (60px + safe area) no tape el contenido */
-    padding-bottom: calc(60px + var(--space-4) + env(safe-area-inset-bottom, 0px));
+    padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom, 0px));
   }
 }

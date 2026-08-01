@@ -219,7 +219,10 @@ export default function Cuotas() {
                 </thead>
                 <tbody>
                   {visibleItems.map((item) => {
-                    const pct = item.total_cuotas > 0 ? (item.cuota_actual / item.total_cuotas) * 100 : 0;
+                    // Cuota que corresponde a ESTE mes: avanza sola con el calendario.
+                    const rawN = item.cuota_actual + (now.getFullYear() - item.anio_inicio) * 12 + (now.getMonth() + 1 - item.mes_inicio);
+                    const nAct = Math.max(0, Math.min(item.total_cuotas, rawN));
+                    const pct = item.total_cuotas > 0 ? (nAct / item.total_cuotas) * 100 : 0;
                     return (
                       <tr key={item.id} style={{ opacity: item.activa ? 1 : 0.45 }}>
                         <td>
@@ -238,7 +241,7 @@ export default function Cuotas() {
                               <div className="progress-bar__fill" style={{ width: `${Math.min(100, pct)}%`, background: "var(--warning)" }} />
                             </div>
                             <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
-                              {item.cuota_actual} / {item.total_cuotas}
+                              {nAct} / {item.total_cuotas}
                             </span>
                           </div>
                         </td>
