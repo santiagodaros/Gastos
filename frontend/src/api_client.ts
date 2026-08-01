@@ -34,6 +34,11 @@ async function getDolarRate(): Promise<number> {
   return rate;
 }
 
+// Resuelve la cotización por (anio, mes): usa la guardada de ese mes, o la actual.
+function makeRateFor(map: Map<string, number>, current: number) {
+  return (anio: number, mes: number) => map.get(`${anio}-${mes}`) ?? current;
+}
+
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface GastoMensual {
@@ -172,11 +177,55 @@ export const dolarApi = {
   }),
 };
 
+// ─── Cotización del dólar por mes ─────────────────────────────────────────────
+
+export const cotizacionesApi = {
+  getMap: async (): Promise<Map<string, number>> => {
+    const map = new Map<string, number>();
+    const { data, error } = await supabase.from("cotizaciones").select("anio, mes, valor");
+    if (error) return map; // tabla sin crear → mapa vacío (cae al dólar actual)
+    for (const r of (data ?? []) as { anio: number; mes: number; valor: number }[]) {
+      map.set(`${r.anio}-${r.mes}`, r.valor);
+    }
+    return map;
+  },
+
+  get: async (anio: number, mes: number): Promise<number | null> => {
+    const { data, error } = await supabase
+      .from("cotizaciones").select("valor").eq("anio", anio).eq("mes", mes).maybeSingle();
+    if (error) return null;
+    return data?.valor ?? null;
+  },
+
+  upsert: async (anio: number, mes: number, valor: number): Promise<void> => {
+    const { error } = await supabase
+      .from("cotizaciones")
+      .upsert({ user_id: await uid(), anio, mes, valor }, { onConflict: "user_id,anio,mes" });
+    if (error) throw new Error(error.message);
+  },
+
+  // Captura la cotización del mes actual si todavía no está guardada.
+  ensureCurrent: async (): Promise<void> => {
+    try {
+      const now = new Date();
+      const anio = now.getFullYear(), mes = now.getMonth() + 1;
+      const { data } = await supabase
+        .from("cotizaciones").select("id").eq("anio", anio).eq("mes", mes).maybeSingle();
+      if (data) return;
+      const valor = await getDolarRate();
+      await supabase.from("cotizaciones")
+        .upsert({ user_id: await uid(), anio, mes, valor }, { onConflict: "user_id,anio,mes" });
+    } catch { /* tabla sin crear o sin sesión → ignora */ }
+  },
+};
+
 // ─── Resumen ─────────────────────────────────────────────────────────────────
 
 export const resumenApi = {
   get: async (anio: number, mes: number): Promise<Resumen> => {
-    const dolarRate = await getDolarRate();
+    await cotizacionesApi.ensureCurrent();
+    const [current, rateMap] = await Promise.all([getDolarRate(), cotizacionesApi.getMap()]);
+    const rateFor = makeRateFor(rateMap, current);
     const [ingRes, fijRes, menRes, cuoRes, pauRes] = await Promise.all([
       supabase.from("ingresos").select("*").eq("mes", mes).eq("anio", anio).maybeSingle(),
       supabase.from("gastos_fijos").select("*"),
@@ -191,7 +240,7 @@ export const resumenApi = {
       ok(menRes.data, menRes.error, []),
       ok(cuoRes.data, cuoRes.error, []),
       new Set((pauRes.data ?? []).map((p: { cuota_id: number }) => p.cuota_id)),
-      dolarRate,
+      rateFor,
     );
   },
 
@@ -593,7 +642,8 @@ export const categoriasApi = {
 
 export const historialApi = {
   get: async (meses: number): Promise<ResumenMes[]> => {
-    const dolarRate = await getDolarRate();
+    const [current, rateMap] = await Promise.all([getDolarRate(), cotizacionesApi.getMap()]);
+    const rateFor = makeRateFor(rateMap, current);
     const [fijRes, ingRes, menRes, cuoRes, pauRes] = await Promise.all([
       supabase.from("gastos_fijos").select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria, nota"),
       supabase.from("ingresos").select("id, mes, anio, sueldo, otros"),
@@ -608,7 +658,7 @@ export const historialApi = {
       ok(menRes.data, menRes.error, []),
       ok(cuoRes.data, cuoRes.error, []),
       ok(pauRes.data, pauRes.error, []),
-      dolarRate,
+      rateFor,
     );
   },
 };
@@ -628,7 +678,8 @@ export const proyeccionApi = {
 
 export const resumenCategoriasApi = {
   get: async (anio: number, mes: number): Promise<CategoriaBreakdown[]> => {
-    const dolarRate = await getDolarRate();
+    const [current, rateMap] = await Promise.all([getDolarRate(), cotizacionesApi.getMap()]);
+    const dolarRate = rateMap.get(`${anio}-${mes}`) ?? current;
 
     const [catRes, menRes, fijRes, cuoRes, pauRes] = await Promise.all([
       supabase.from("categorias").select("nombre, color").eq("activa", 1),

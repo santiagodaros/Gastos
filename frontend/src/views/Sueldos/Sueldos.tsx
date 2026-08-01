@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ingresosApi, type Ingresos } from "../../api_client";
+import { ingresosApi, cotizacionesApi, type Ingresos } from "../../api_client";
 import { Card } from "../../components/Card";
 import PeriodSelector from "../../components/PeriodSelector";
 import { usePeriod } from "../../lib/period";
@@ -20,12 +20,13 @@ export default function Sueldos() {
 
   const [sueldo, setSueldo] = useState(0);
   const [otros, setOtros]   = useState(0);
-
+  const [dolar, setDolar]   = useState(0);
 
   function load() {
     setLoading(true);
     setError(null);
     setSaved(false);
+    cotizacionesApi.get(anio, mes).then((v) => setDolar(v ?? 0)).catch(() => setDolar(0));
     ingresosApi.get(anio, mes)
       .then((d) => {
         setData(d);
@@ -53,6 +54,7 @@ export default function Sueldos() {
     setError(null);
     try {
       await ingresosApi.upsert(anio, mes, { sueldo, otros });
+      if (dolar > 0) await cotizacionesApi.upsert(anio, mes, dolar);
       setSaved(true);
       load();
     } catch (e: unknown) {
@@ -120,6 +122,21 @@ export default function Sueldos() {
                 onChange={(e) => setOtros(parseFloat(e.target.value) || 0)}
                 placeholder="0"
               />
+            </div>
+            <div className="form__field">
+              <label className="form__label">Dólar de este mes</label>
+              <input
+                className="form__input"
+                type="number"
+                min={0}
+                step="0.01"
+                value={dolar || ""}
+                onChange={(e) => setDolar(parseFloat(e.target.value) || 0)}
+                placeholder="se toma el dólar actual"
+              />
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 }}>
+                Se usa para convertir tus gastos en USD de este mes. Se completa solo con el dólar actual; ajustalo si querés fijar el de meses pasados.
+              </span>
             </div>
 
             {/* Total preview */}

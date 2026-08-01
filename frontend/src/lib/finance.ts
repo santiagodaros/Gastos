@@ -71,6 +71,10 @@ function cuotaEnMes(c: Cuota, anio: number, mes: number): number {
 
 // ─── Resumen ─────────────────────────────────────────────────────────────────
 
+// rateFor: cotización del dólar para ese (anio, mes). Permite usar la del mes
+// correspondiente en vez de una sola para todo (clave para el historial).
+export type RateFor = (anio: number, mes: number) => number;
+
 export function calcularResumen(
   anio: number,
   mes: number,
@@ -79,8 +83,9 @@ export function calcularResumen(
   mensuales: GastoMensual[],
   cuotas: Cuota[],
   pausadas: Set<number>,
-  dolarRate: number
+  rateFor: RateFor
 ): Resumen {
+  const dolarRate = rateFor(anio, mes);
   const sueldo = ingresos?.sueldo ?? 0;
   const otros  = ingresos?.otros  ?? 0;
   const ing    = sueldo + otros;
@@ -124,7 +129,7 @@ export function calcularHistorial(
   allMensuales: GastoMensual[],
   allCuotas: Cuota[],
   allPausadas: { cuota_id: number; mes: number; anio: number }[],
-  dolarRate: number
+  rateFor: RateFor
 ): ResumenMes[] {
   const today = new Date();
   const result: ResumenMes[] = [];
@@ -141,7 +146,7 @@ export function calcularHistorial(
       allPausadas.filter((p) => p.mes === m && p.anio === y).map((p) => p.cuota_id)
     );
 
-    const resumen = calcularResumen(y, m, ingresos, allFijos, mensuales, allCuotas, pausadas, dolarRate);
+    const resumen = calcularResumen(y, m, ingresos, allFijos, mensuales, allCuotas, pausadas, rateFor);
     result.push({ ...resumen, label: `${MONTH_LABELS[m - 1]} ${y}` });
   }
 
