@@ -457,8 +457,71 @@ async function handleMulti(lines: string[], chatId: number) {
   await sendMessage(chatId, `<b>Cargas (${lines.length})</b>\n${out.join("\n")}`);
 }
 
+// ── Alertas proactivas (cron diario) ─────────────────────────
+async function getPresupuesto() {
+  const { data } = await db.from("presupuesto")
+    .select("pct_ahorro, pct_cuotas, pct_gastos").eq("user_id", APP_USER_ID).maybeSingle();
+  return data ?? { pct_ahorro: 20, pct_cuotas: 30, pct_gastos: 50 };
+}
+
+// ¿Ya mandamos esta alerta? (dedup vía la tabla notificaciones)
+async function yaAlertado(refTabla: string, refId: number): Promise<boolean> {
+  const { data } = await db.from("notificaciones")
+    .select("id").eq("user_id", APP_USER_ID).eq("ref_tabla", refTabla).eq("ref_id", refId).maybeSingle();
+  return !!data;
+}
+
+async function runDailyChecks() {
+  if (!ALLOWED_CHAT_ID) return;
+  const chatId = ALLOWED_CHAT_ID;
+  const d = new Date(Date.now() - 3 * 3600 * 1000);
+  const day = d.getUTCDate();
+  const mes = d.getUTCMonth() + 1;
+  const anio = d.getUTCFullYear();
+
+  // 1) El día 1: resumen del mes que cerró.
+  if (day === 1) {
+    const pm = mes === 1 ? 12 : mes - 1;
+    const py = mes === 1 ? anio - 1 : anio;
+    const r = await resumenMes(py, pm);
+    let txt = `📅 <b>Cerró ${MESES_FULL[pm - 1]} ${py}</b>\n`;
+    txt += `Ingresos: <b>${fmtArs(r.ingresos)}</b>\n`;
+    txt += `Gastos: <b>${fmtArs(r.total)}</b> (fijos ${fmtArs(r.fijos)} · mensuales ${fmtArs(r.mensuales)} · cuotas ${fmtArs(r.cuotas)})\n`;
+    txt += `Balance: <b>${fmtArs(r.balance)}</b>`;
+    await sendMessage(chatId, txt);
+  }
+
+  // 2) Presupuesto de gastos: aviso una vez al mes al cruzar el 90%.
+  const r = await resumenMes(anio, mes);
+  const presu = await getPresupuesto();
+  const budget = (presu.pct_gastos / 100) * r.sueldo;
+  const usado = r.fijos + r.mensuales; // "gastos" = fijos + mensuales (las cuotas van aparte)
+  if (budget > 0 && usado >= budget * 0.9) {
+    const refId = anio * 100 + mes;
+    if (!(await yaAlertado("alerta_presupuesto", refId))) {
+      const pct = Math.round((usado / budget) * 100);
+      const rest = budget - usado;
+      const linea = rest >= 0
+        ? `Te queda <b>${fmtArs(rest)}</b> del presupuesto de gastos.`
+        : `Te <b>excediste ${fmtArs(-rest)}</b> del presupuesto de gastos.`;
+      await sendMessage(chatId, `⚠️ <b>Presupuesto de gastos al ${pct}%</b>\nUsaste ${fmtArs(usado)} de ${fmtArs(budget)}.\n${linea}`);
+      await notificar("⚠️ Presupuesto de gastos", `Al ${pct}% en ${MESES_FULL[mes - 1]}`, "alerta_presupuesto", refId);
+    }
+  }
+}
+
 // ── Entry point ───────────────────────────────────────────────
 Deno.serve(async (req) => {
+  // Disparador de cron (pg_cron/pg_net): /telegram-bot?task=cron&secret=...
+  const url = new URL(req.url);
+  if (url.searchParams.get("task") === "cron") {
+    if (WEBHOOK_SECRET && url.searchParams.get("secret") !== WEBHOOK_SECRET) {
+      return new Response("forbidden", { status: 401 });
+    }
+    try { await runDailyChecks(); } catch (e) { console.error("cron:", (e as Error).message); }
+    return new Response("ok");
+  }
+
   if (WEBHOOK_SECRET) {
     const got = req.headers.get("x-telegram-bot-api-secret-token");
     if (got !== WEBHOOK_SECRET) return new Response("forbidden", { status: 401 });
