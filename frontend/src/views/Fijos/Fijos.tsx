@@ -4,6 +4,7 @@ import { getCotizacionDolar } from "../../lib/finance";
 import { Card } from "../../components/Card";
 import { Modal, ConfirmModal } from "../../components/Modal";
 import PeriodSelector from "../../components/PeriodSelector";
+import { usePeriod } from "../../lib/period";
 import "../../styles/abm.css";
 
 const MONEDAS = ["ARS", "USD"];
@@ -25,9 +26,7 @@ function fmt(n: number, moneda: string) {
 }
 
 export default function Fijos() {
-  const now = new Date();
-  const [anio, setAnio] = useState(now.getFullYear());
-  const [mes, setMes]   = useState(now.getMonth() + 1);
+  const { anio, mes, prev, next, goToday, isCurrent } = usePeriod();
 
   const [items, setItems]       = useState<GastoFijo[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -42,14 +41,6 @@ export default function Fijos() {
   const [toDelete, setToDelete] = useState<GastoFijo | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  function prevMonth() {
-    if (mes === 1) { setMes(12); setAnio((y) => y - 1); }
-    else setMes((m) => m - 1);
-  }
-  function nextMonth() {
-    if (mes === 12) { setMes(1); setAnio((y) => y + 1); }
-    else setMes((m) => m + 1);
-  }
 
   function load() {
     setLoading(true);
@@ -118,7 +109,7 @@ export default function Fijos() {
     <div className="abm">
       <div className="abm__toolbar">
         <div className="abm__toolbar-left">
-          <PeriodSelector anio={anio} mes={mes} onPrev={prevMonth} onNext={nextMonth} />
+          <PeriodSelector anio={anio} mes={mes} onPrev={prev} onNext={next} onToday={goToday} isCurrent={isCurrent} />
           {!loading && (
             <span className="badge badge--neutral">{activos.length} activos</span>
           )}

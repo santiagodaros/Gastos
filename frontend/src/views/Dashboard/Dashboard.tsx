@@ -8,6 +8,8 @@ import BudgetRing from "../../components/BudgetRing";
 import CountUp from "../../components/CountUp";
 import { Skeleton } from "../../components/Skeleton";
 import { useNav } from "../../lib/nav";
+import { usePeriod } from "../../lib/period";
+import PeriodSelector from "../../components/PeriodSelector";
 import type { ViewId } from "../../components/Sidebar";
 import "../../styles/abm.css";
 import "./Dashboard.css";
@@ -36,8 +38,7 @@ const BUCKET_TO_VIEW: Record<string, ViewId> = {
 export default function Dashboard() {
   const nav = useNav();
   const now = new Date();
-  const [anio, setAnio] = useState(now.getFullYear());
-  const [mes, setMes]   = useState(now.getMonth() + 1);
+  const { anio, mes, prev, next, goToday, isCurrent } = usePeriod();
 
   const [resumen, setResumen] = useState<Resumen | null>(null);
   const [catBreakdown, setCatBreakdown] = useState<CategoriaBreakdown[]>([]);
@@ -83,15 +84,6 @@ export default function Dashboard() {
       .finally(() => setLoading(false));
   }, [anio, mes, refreshKey]);
 
-  function prevMonth() {
-    if (mes === 1) { setMes(12); setAnio((y) => y - 1); }
-    else setMes((m) => m - 1);
-  }
-
-  function nextMonth() {
-    if (mes === 12) { setMes(1); setAnio((y) => y + 1); }
-    else setMes((m) => m + 1);
-  }
 
   // Donut slices para distribución de gastos
   const donutSlices: DonutSlice[] = resumen
@@ -137,19 +129,7 @@ export default function Dashboard() {
     <div className="dashboard">
       {/* Period selector */}
       <div className="dashboard__period">
-        <button className="dashboard__period-btn" onClick={prevMonth}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="15 18 9 12 15 6" />
-          </svg>
-        </button>
-        <span className="dashboard__period-label">
-          {MONTHS[mes - 1]} {anio}
-        </span>
-        <button className="dashboard__period-btn" onClick={nextMonth}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <polyline points="9 18 15 12 9 6" />
-          </svg>
-        </button>
+        <PeriodSelector anio={anio} mes={mes} onPrev={prev} onNext={next} onToday={goToday} isCurrent={isCurrent} />
 
         {resumen && (
           <span className="dolar-badge">

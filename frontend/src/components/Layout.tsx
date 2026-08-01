@@ -4,6 +4,7 @@ import NotificationBell from "./NotificationBell";
 import { useTheme } from "../lib/theme";
 import { useAuth } from "../lib/auth";
 import { NavContext } from "../lib/nav";
+import { PeriodProvider } from "../lib/period";
 import "./Layout.css";
 
 const VIEW_TITLES: Record<ViewId, string> = {
@@ -45,6 +46,7 @@ export default function Layout({ children }: LayoutProps) {
 
   return (
     <NavContext.Provider value={handleNavigate}>
+    <PeriodProvider>
     <div className="layout">
       {/* Overlay backdrop — solo en mobile cuando el sidebar está abierto */}
       {mobileOpen && (
@@ -90,6 +92,7 @@ export default function Layout({ children }: LayoutProps) {
       </div>
 
     </div>
+    </PeriodProvider>
     </NavContext.Provider>
   );
 }

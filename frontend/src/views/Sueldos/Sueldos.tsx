@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { ingresosApi, type Ingresos } from "../../api_client";
 import { Card } from "../../components/Card";
 import PeriodSelector from "../../components/PeriodSelector";
+import { usePeriod } from "../../lib/period";
 import "../../styles/abm.css";
 
 function fmt(n: number) {
@@ -9,9 +10,7 @@ function fmt(n: number) {
 }
 
 export default function Sueldos() {
-  const now = new Date();
-  const [anio, setAnio] = useState(now.getFullYear());
-  const [mes, setMes]   = useState(now.getMonth() + 1);
+  const { anio, mes, prev, next, goToday, isCurrent } = usePeriod();
 
   const [data, setData]     = useState<Ingresos | null>(null);
   const [loading, setLoading] = useState(true);
@@ -22,14 +21,6 @@ export default function Sueldos() {
   const [sueldo, setSueldo] = useState(0);
   const [otros, setOtros]   = useState(0);
 
-  function prevMonth() {
-    if (mes === 1) { setMes(12); setAnio((y) => y - 1); }
-    else setMes((m) => m - 1);
-  }
-  function nextMonth() {
-    if (mes === 12) { setMes(1); setAnio((y) => y + 1); }
-    else setMes((m) => m + 1);
-  }
 
   function load() {
     setLoading(true);
@@ -75,7 +66,7 @@ export default function Sueldos() {
     <div className="abm">
       <div className="abm__toolbar">
         <div className="abm__toolbar-left">
-          <PeriodSelector anio={anio} mes={mes} onPrev={prevMonth} onNext={nextMonth} />
+          <PeriodSelector anio={anio} mes={mes} onPrev={prev} onNext={next} onToday={goToday} isCurrent={isCurrent} />
           {data && <span className="badge badge--positive">Registrado</span>}
           {!data && !loading && <span className="badge badge--neutral">Sin registro</span>}
         </div>

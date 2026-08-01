@@ -7,6 +7,7 @@ import ImportResumen from "../../components/ImportResumen";
 import Lightbox from "../../components/Lightbox";
 import { useToast } from "../../components/Toast";
 import PeriodSelector from "../../components/PeriodSelector";
+import { usePeriod } from "../../lib/period";
 import "../../styles/abm.css";
 import "./GastosMensuales.css";
 
@@ -45,9 +46,7 @@ function fmtFecha(iso?: string | null) {
 
 export default function GastosMensuales() {
   const toast = useToast();
-  const now = new Date();
-  const [anio, setAnio] = useState(now.getFullYear());
-  const [mes, setMes]   = useState(now.getMonth() + 1);
+  const { anio, mes, prev, next, goToday, isCurrent } = usePeriod();
 
   const [items, setItems]           = useState<GastoMensual[]>([]);
   const [categorias, setCategorias] = useState<Categoria[]>([]);
@@ -65,15 +64,6 @@ export default function GastosMensuales() {
   const [showImport, setShowImport] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [viewPath, setViewPath] = useState<string | null>(null);
-
-  function prevMonth() {
-    if (mes === 1) { setMes(12); setAnio((y) => y - 1); }
-    else setMes((m) => m - 1);
-  }
-  function nextMonth() {
-    if (mes === 12) { setMes(1); setAnio((y) => y + 1); }
-    else setMes((m) => m + 1);
-  }
 
   function load() {
     setLoading(true);
@@ -157,7 +147,7 @@ export default function GastosMensuales() {
     <div className="abm">
       <div className="abm__toolbar">
         <div className="abm__toolbar-left">
-          <PeriodSelector anio={anio} mes={mes} onPrev={prevMonth} onNext={nextMonth} />
+          <PeriodSelector anio={anio} mes={mes} onPrev={prev} onNext={next} onToday={goToday} isCurrent={isCurrent} />
           {!loading && (
             <span className="badge badge--neutral">{items.length} registros</span>
           )}
