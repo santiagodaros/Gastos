@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { gastosApi, categoriasApi, tarjetasApi, comprobantesApi, type GastoMensual, type GastoMensualCreate, type Categoria, type Tarjeta } from "../../api_client";
 import { getCotizacionDolar } from "../../lib/finance";
 import { Card } from "../../components/Card";
@@ -64,6 +64,11 @@ export default function GastosMensuales() {
   const [showImport, setShowImport] = useState(false);
   const [file, setFile] = useState<File | null>(null);
   const [viewPath, setViewPath] = useState<string | null>(null);
+
+  // Búsqueda y filtros
+  const [q, setQ]       = useState("");
+  const [fCat, setFCat] = useState("");
+  const [fTar, setFTar] = useState("");
 
   function load() {
     setLoading(true);
@@ -141,7 +146,19 @@ export default function GastosMensuales() {
     }
   }
 
-  const total = items.reduce((s, i) => s + (i.moneda === "USD" ? i.monto * dolarRate : i.monto), 0);
+  const filtered = useMemo(() => {
+    const query = q.trim().toLowerCase();
+    return items.filter((i) => {
+      if (query && !(i.nombre.toLowerCase().includes(query) || (i.nota ?? "").toLowerCase().includes(query))) return false;
+      if (fCat && i.categoria !== fCat) return false;
+      if (fTar === "efectivo" && i.tarjeta_id) return false;
+      if (fTar && fTar !== "efectivo" && i.tarjeta_id !== parseInt(fTar)) return false;
+      return true;
+    });
+  }, [items, q, fCat, fTar]);
+
+  const filtering = q.trim() !== "" || fCat !== "" || fTar !== "";
+  const total = filtered.reduce((s, i) => s + (i.moneda === "USD" ? i.monto * dolarRate : i.monto), 0);
 
   return (
     <div className="abm">
@@ -149,7 +166,9 @@ export default function GastosMensuales() {
         <div className="abm__toolbar-left">
           <PeriodSelector anio={anio} mes={mes} onPrev={prev} onNext={next} onToday={goToday} isCurrent={isCurrent} />
           {!loading && (
-            <span className="badge badge--neutral">{items.length} registros</span>
+            <span className="badge badge--neutral">
+              {filtering ? `${filtered.length} de ${items.length}` : `${items.length} registros`}
+            </span>
           )}
           {!loading && items.some((i) => i.tarjeta_id && !i.verificado) && (
             <span className="badge" style={{ background: "var(--warning-muted)", color: "var(--warning)" }}>
@@ -175,6 +194,29 @@ export default function GastosMensuales() {
 
       {error && <p style={{ color: "var(--negative)", fontSize: "var(--text-sm)" }}>{error}</p>}
 
+      {!loading && items.length > 0 && (
+        <div className="gm-filters">
+          <input
+            className="gm-filters__search"
+            placeholder="Buscar por nombre o nota…"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+          />
+          <select className="gm-filters__select" value={fCat} onChange={(e) => setFCat(e.target.value)}>
+            <option value="">Todas las categorías</option>
+            {categorias.map((c) => <option key={c.id} value={c.nombre}>{c.nombre}</option>)}
+          </select>
+          <select className="gm-filters__select" value={fTar} onChange={(e) => setFTar(e.target.value)}>
+            <option value="">Todos los medios</option>
+            <option value="efectivo">Efectivo / Débito</option>
+            {tarjetas.map((t) => <option key={t.id} value={t.id}>{t.nombre} ···{t.ultimos_4}</option>)}
+          </select>
+          {filtering && (
+            <button className="btn-ghost" onClick={() => { setQ(""); setFCat(""); setFTar(""); }}>Limpiar</button>
+          )}
+        </div>
+      )}
+
       <Card>
         {loading ? (
           <div className="abm-loading"><div className="spinner" /></div>
@@ -185,6 +227,8 @@ export default function GastosMensuales() {
             </svg>
             Sin gastos para este período
           </div>
+        ) : filtered.length === 0 ? (
+          <div className="abm-empty">Ningún gasto coincide con el filtro</div>
         ) : (
           <table className="abm-table">
             <thead>
@@ -197,7 +241,7 @@ export default function GastosMensuales() {
               </tr>
             </thead>
             <tbody>
-              {items.map((item) => (
+              {filtered.map((item) => (
                 <tr key={item.id}>
                   <td style={{ color: "var(--text-muted)", fontVariantNumeric: "tabular-nums", fontSize: "var(--text-sm)" }}>
                     {fmtFecha(item.fecha)}
@@ -261,8 +305,8 @@ export default function GastosMensuales() {
             <tfoot>
               <tr>
                 <td colSpan={3} style={{ paddingTop: "var(--space-4)", fontSize: "var(--text-xs)", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
-                  Total ARS
-                  {dolarRate > 0 && items.some((i) => i.moneda === "USD") && (
+                  {filtering ? "Total filtrado" : "Total ARS"}
+                  {dolarRate > 0 && filtered.some((i) => i.moneda === "USD") && (
                     <span style={{ display: "block", marginTop: 2, textTransform: "none", letterSpacing: 0 }}>USD @ {fmt(dolarRate, "ARS")}</span>
                   )}
                 </td>
