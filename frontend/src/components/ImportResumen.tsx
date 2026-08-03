@@ -204,6 +204,12 @@ export default function ImportResumen({ anio, mes, onClose, onApplied }: Props) 
 
   const okCount = recon.enFijos.length + recon.enGastos.length + recon.cuotasOk.length;
 
+  // Total neto del resumen (con signo): créditos/reintegros ya restan.
+  const txs = parsed?.transacciones ?? [];
+  const netArs = txs.filter((t) => t.moneda !== "USD").reduce((s, t) => s + t.monto, 0);
+  const netUsd = txs.filter((t) => t.moneda === "USD").reduce((s, t) => s + t.monto, 0);
+  const hayCreditos = txs.some((t) => t.monto < 0);
+
   return (
     <Modal title="Importar resumen de tarjeta" size="lg" onClose={onClose}>
       {error && <p className="ir-error">{error}</p>}
@@ -263,8 +269,11 @@ export default function ImportResumen({ anio, mes, onClose, onApplied }: Props) 
                   <li key={i} className="ir-row">
                     <input type="checkbox" checked={addSet.has(i)} onChange={() => toggle(addSet, setAddSet, i)} />
                     <span className="ir-date">{fmtFecha(tx.fecha)}</span>
-                    <span className="ir-desc">{tx.descripcion}</span>
-                    <span className="ir-amount">{fmt(tx.monto, tx.moneda)}</span>
+                    <span className="ir-desc">
+                      {tx.descripcion}
+                      {tx.monto < 0 && <span className="ir-tag" style={{ marginLeft: 6, color: "var(--positive)" }}>crédito / reintegro</span>}
+                    </span>
+                    <span className="ir-amount" style={tx.monto < 0 ? { color: "var(--positive)" } : undefined}>{fmt(tx.monto, tx.moneda)}</span>
                   </li>
                 ))}
               </ul>
@@ -352,6 +361,10 @@ export default function ImportResumen({ anio, mes, onClose, onApplied }: Props) 
           <div className="ir-footer">
             <div className="ir-totals">
               <span>{okCount} ya cargados · {recon.faltantes.length} faltan</span>
+              <span>
+                Total del resumen: <b>{fmt(netArs, "ARS")}</b>{netUsd !== 0 ? ` · ${fmt(netUsd, "USD")}` : ""}
+                {hayCreditos && <span style={{ color: "var(--positive)", marginLeft: 6 }}>(ya con créditos restados)</span>}
+              </span>
             </div>
             <button className="btn-primary" onClick={apply} disabled={applying}>
               {applying ? "Aplicando..." : `Aplicar (${addSet.size} gastos${addCuotaSet.size ? `, ${addCuotaSet.size} cuotas` : ""})`}

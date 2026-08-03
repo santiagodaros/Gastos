@@ -12,7 +12,7 @@
 export interface StmtTx {
   fecha: string;               // YYYY-MM-DD
   descripcion: string;
-  monto: number;               // positivo, en su moneda
+  monto: number;               // con signo: negativo = crédito / reintegro / reversa
   moneda: "ARS" | "USD";
   tipo: "compra" | "cuota";
   cuota?: string;              // "03/03" si es cuota
@@ -64,14 +64,14 @@ export function parseGaliciaStatement(lines: string[]): ParsedStatement {
     if (!fecha) continue;
 
     // El monto es el último importe con formato AR de la línea. Sin importe
-    // no es un consumo (ej: la fila de fechas de vencimiento). Si es negativo,
-    // es un crédito/reintegro → no es una compra, lo salteamos.
+    // no es un consumo (ej: la fila de fechas de vencimiento). El signo se
+    // conserva: negativo = crédito / reintegro / reversa (resta de lo que debés).
+    // Los pagos de la tarjeta (SU PAGO) ya los saltea SKIP_RE más arriba.
     const matches = [...rest.matchAll(AMOUNT_RE)];
     if (matches.length === 0) continue;
     const last = matches[matches.length - 1];
-    if (last[1] === "-") continue;
-    const monto = parseMonto(last[2]);
-    if (monto <= 0) continue;
+    const monto = parseMonto(last[2]) * (last[1] === "-" ? -1 : 1);
+    if (monto === 0) continue;
 
     const moneda: StmtTx["moneda"] = /USD|U\$S/i.test(line) ? "USD" : "ARS";
     const cuotaMatch = rest.match(CUOTA_RE);
