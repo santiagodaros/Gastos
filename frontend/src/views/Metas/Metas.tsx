@@ -64,6 +64,7 @@ export default function Metas() {
   const [editItem, setEditItem] = useState<MetaAhorro | null>(null);
   const [form, setForm]         = useState<MetaAhorroCreate>({ ...EMPTY_FORM });
   const [deposito, setDeposito] = useState(0);
+  const [fechaDep, setFechaDep] = useState("");
   const [toDelete, setToDelete] = useState<MetaAhorro | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -108,6 +109,8 @@ export default function Metas() {
   function openDepositar(item: MetaAhorro) {
     setEditItem(item);
     setDeposito(0);
+    const hoy = new Date();
+    setFechaDep(`${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`);
     setModal("depositar");
   }
 
@@ -136,7 +139,7 @@ export default function Metas() {
     if (!editItem || deposito <= 0) return;
     setSaving(true);
     try {
-      await metasApi.depositar(editItem.id, deposito);
+      await metasApi.depositar(editItem.id, deposito, fechaDep || undefined);
       toast.success("Depósito registrado");
       setModal(null);
       load();
@@ -596,6 +599,19 @@ export default function Metas() {
                 required
                 autoFocus
               />
+            </div>
+            <div className="form__field">
+              <label className="form__label">Fecha</label>
+              <input
+                className="form__input"
+                type="date"
+                value={fechaDep}
+                onChange={(e) => setFechaDep(e.target.value)}
+                required
+              />
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: "var(--space-1)" }}>
+                Cuenta como ahorro del mes de esta fecha. Si invertís con el sueldo del mes pasado, poné una fecha de ese mes.
+              </div>
             </div>
             <div className="form__actions">
               <button type="button" className="btn-ghost" onClick={() => setModal(null)}>Cancelar</button>
