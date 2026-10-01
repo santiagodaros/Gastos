@@ -33,6 +33,7 @@ const BUCKET_TO_VIEW: Record<string, ViewId> = {
   Fijos: "fijos",
   Mensuales: "gastos",
   Cuotas: "cuotas",
+  Inversión: "metas",
 };
 
 export default function Dashboard() {
@@ -90,8 +91,15 @@ export default function Dashboard() {
         { label: "Fijos",    value: resumen.gastos_fijos,     color: "var(--accent)"    },
         { label: "Mensuales",value: resumen.gastos_mensuales, color: "var(--warning)"   },
         { label: "Cuotas",   value: resumen.cuotas,           color: "var(--negative)"  },
+        { label: "Inversión",value: resumen.ahorro,           color: "var(--positive)"  },
       ].filter((s) => s.value > 0)
     : [];
+
+  // El ahorro del mes también es una salida de plata: se suma al desglose por categoría.
+  const catConAhorro: CategoriaBreakdown[] = resumen && resumen.ahorro > 0
+    ? [...catBreakdown, { categoria: "Inversión", color: "var(--positive)", total: resumen.ahorro }]
+        .sort((a, b) => b.total - a.total)
+    : catBreakdown;
 
   // Balance como % de ingresos
   const balancePct = resumen && resumen.ingresos > 0
@@ -305,8 +313,8 @@ export default function Dashboard() {
                   slices={donutSlices}
                   size={180}
                   thickness={24}
-                  centerLabel="gastos"
-                  centerValue={fmtShort(resumen.total_gastos)}
+                  centerLabel={resumen.ahorro > 0 ? "salidas" : "gastos"}
+                  centerValue={fmtShort(resumen.total_gastos + Math.max(0, resumen.ahorro))}
                   formatValue={(v) => v.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 })}
                   onSliceClick={(i) => {
                     const view = BUCKET_TO_VIEW[donutSlices[i].label];
@@ -367,7 +375,7 @@ export default function Dashboard() {
                 </div>
               </div>
 
-              <div className="balance-bar">
+              <div className="balance-bar" style={resumen.ahorro > 0 ? { marginBottom: "var(--space-5)" } : undefined}>
                 <div className="balance-bar__header">
                   <span className="balance-bar__title">Cuotas</span>
                   <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
@@ -388,6 +396,30 @@ export default function Dashboard() {
                   <span>de {fmt(resumen.ingresos)}</span>
                 </div>
               </div>
+
+              {resumen.ahorro > 0 && (
+                <div className="balance-bar">
+                  <div className="balance-bar__header">
+                    <span className="balance-bar__title">Inversión</span>
+                    <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", fontVariantNumeric: "tabular-nums" }}>
+                      {resumen.ingresos > 0 ? ((resumen.ahorro / resumen.ingresos) * 100).toFixed(0) : 0}%
+                    </span>
+                  </div>
+                  <div className="balance-bar__track">
+                    <div
+                      className="balance-bar__fill"
+                      style={{
+                        width: resumen.ingresos > 0 ? `${Math.min(100, (resumen.ahorro / resumen.ingresos) * 100)}%` : "0%",
+                        background: "var(--positive)",
+                      }}
+                    />
+                  </div>
+                  <div className="balance-bar__labels">
+                    <span>{fmt(resumen.ahorro)}</span>
+                    <span>de {fmt(resumen.ingresos)}</span>
+                  </div>
+                </div>
+              )}
             </Card>
           </div>
 
@@ -438,23 +470,23 @@ export default function Dashboard() {
           {/* Desglose por categoría */}
           <Card>
             <p className="dashboard__section-title">Desglose por Categoría</p>
-            {catBreakdown.length === 0 ? (
+            {catConAhorro.length === 0 ? (
               <p style={{ color: "var(--text-muted)", fontSize: "var(--text-sm)" }}>
                 Sin gastos categorizados este período.
               </p>
             ) : (
               <div className="cat-breakdown">
                 <DonutChart
-                  slices={catBreakdown.map((b) => ({ label: b.categoria, value: b.total, color: b.color }))}
+                  slices={catConAhorro.map((b) => ({ label: b.categoria, value: b.total, color: b.color }))}
                   size={170}
                   thickness={22}
                   centerLabel="total"
-                  centerValue={fmtShort(catBreakdown.reduce((s, b) => s + b.total, 0))}
+                  centerValue={fmtShort(catConAhorro.reduce((s, b) => s + b.total, 0))}
                   formatValue={(v) => v.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 })}
                 />
                 <div className="cat-breakdown__legend" style={{ display: "flex", flexDirection: "column", gap: "var(--space-2)", alignSelf: "center" }}>
-                  {catBreakdown.map((b) => {
-                    const totalAll = catBreakdown.reduce((s, x) => s + x.total, 0);
+                  {catConAhorro.map((b) => {
+                    const totalAll = catConAhorro.reduce((s, x) => s + x.total, 0);
                     const pct = totalAll > 0 ? (b.total / totalAll) * 100 : 0;
                     return (
                       <div key={b.categoria} style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
