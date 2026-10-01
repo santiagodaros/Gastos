@@ -881,10 +881,20 @@ export const ahorroMesApi = {
     const nextM = mes === 12 ? 1 : mes + 1;
     const nextY = mes === 12 ? anio + 1 : anio;
     const end = `${nextY}-${String(nextM).padStart(2, "0")}-01`;
-    const { data, error } = await supabase
-      .from("depositos_ahorro").select("monto, fecha").gte("fecha", start).lt("fecha", end);
+    const [{ data, error }, rateMap, current] = await Promise.all([
+      supabase.from("depositos_ahorro")
+        .select("monto, fecha, metas_ahorro(moneda)").gte("fecha", start).lt("fecha", end),
+      cotizacionesApi.getMap(),
+      getDolarRate(),
+    ]);
     if (error) return 0;
-    return (data ?? []).reduce((s: number, d: { monto: number }) => s + d.monto, 0);
+    const rate = makeRateFor(rateMap, current)(anio, mes);
+    // los depósitos están en la moneda de su meta: se pesifican para sumar contra el sueldo
+    type Row = { monto: number; metas_ahorro: { moneda: string } | { moneda: string }[] | null };
+    return ((data ?? []) as unknown as Row[]).reduce((sum, d) => {
+      const meta = Array.isArray(d.metas_ahorro) ? d.metas_ahorro[0] : d.metas_ahorro;
+      return sum + (meta?.moneda === "USD" ? d.monto * rate : d.monto);
+    }, 0);
   },
 };
 
