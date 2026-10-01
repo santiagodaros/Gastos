@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { resumenApi, resumenCategoriasApi, cuotasApi, presupuestoApi, ahorroMesApi, type Resumen, type CategoriaBreakdown, type Cuota, type Presupuesto } from "../../api_client";
+import { resumenApi, resumenCategoriasApi, cuotasApi, presupuestoApi, type Resumen, type CategoriaBreakdown, type Cuota, type Presupuesto } from "../../api_client";
 import { MetricCard } from "../../components/Card";
 import { Card } from "../../components/Card";
 import DonutChart, { type DonutSlice } from "../../components/DonutChart";
@@ -61,13 +61,12 @@ export default function Dashboard() {
       resumenCategoriasApi.get(anio, mes),
       cuotasApi.list(),
       presupuestoApi.get(),
-      ahorroMesApi.get(anio, mes),
     ])
-      .then(([r, cats, cuotas, presupuesto, ahorro]) => {
+      .then(([r, cats, cuotas, presupuesto]) => {
         setResumen(r);
         setCatBreakdown(cats);
         setPresu(presupuesto);
-        setAhorroMes(ahorro);
+        setAhorroMes(r.ahorro);
         // Cuotas que terminan en los próximos 3 meses (inclusive el mes actual)
         const pronto = cuotas
           .filter((c) => c.activa)
@@ -197,12 +196,13 @@ export default function Dashboard() {
               { label: "Ingresos", value: resumen.ingresos, color: "var(--positive)" },
               { label: "Gastos", value: resumen.total_gastos, color: "var(--negative)" },
               { label: "Cuotas", value: resumen.cuotas, color: "var(--warning)" },
+              { label: "Ahorro", value: resumen.ahorro, color: "var(--accent)" },
               { label: "Balance", value: resumen.balance, color: resumen.balance >= 0 ? "var(--positive)" : "var(--negative)" },
-            ];
+            ].filter((r) => r.label !== "Ahorro" || r.value > 0);
             return (
               <Card className="dashboard__hero">
                 <div className="dashboard__hero-inner">
-                  <BudgetRing used={resumen.total_gastos} budget={base} fmt={fmt} />
+                  <BudgetRing used={resumen.total_gastos + resumen.ahorro} budget={base} fmt={fmt} />
                   <div className="dashboard__hero-stats">
                     <p className="dashboard__hero-title">
                       {resumen.sueldo > 0 ? "Gastado del sueldo" : "Gastado de tus ingresos"} este mes
@@ -264,7 +264,7 @@ export default function Dashboard() {
               }
               badge={
                 resumen.balance >= 0
-                  ? { text: `+${balancePct.toFixed(0)}% guardado`, type: "positive" }
+                  ? { text: `+${balancePct.toFixed(0)}% libre`, type: "positive" }
                   : { text: "Déficit", type: "negative" }
               }
               footer={fmt(resumen.balance)}

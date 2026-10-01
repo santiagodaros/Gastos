@@ -83,7 +83,8 @@ export function calcularResumen(
   mensuales: GastoMensual[],
   cuotas: Cuota[],
   pausadas: Set<number>,
-  rateFor: RateFor
+  rateFor: RateFor,
+  ahorro = 0   // depositado en metas ese mes, en ARS: sale del balance pero no es gasto
 ): Resumen {
   const dolarRate = rateFor(anio, mes);
   const sueldo = ingresos?.sueldo ?? 0;
@@ -110,7 +111,7 @@ export function calcularResumen(
     mes, anio,
     ingresos: ing, sueldo, otros,
     gastos_fijos: fij, gastos_mensuales: men, cuotas: cuo,
-    total_gastos: total, balance: ing - total,
+    total_gastos: total, ahorro, balance: ing - total - ahorro,
     dolar_rate: dolarRate,
   };
 }
@@ -129,7 +130,8 @@ export function calcularHistorial(
   allMensuales: GastoMensual[],
   allCuotas: Cuota[],
   allPausadas: { cuota_id: number; mes: number; anio: number }[],
-  rateFor: RateFor
+  rateFor: RateFor,
+  ahorroPorMes: Map<string, number> = new Map()   // clave "anio-mes", en ARS
 ): ResumenMes[] {
   const today = new Date();
   const result: ResumenMes[] = [];
@@ -146,7 +148,7 @@ export function calcularHistorial(
       allPausadas.filter((p) => p.mes === m && p.anio === y).map((p) => p.cuota_id)
     );
 
-    const resumen = calcularResumen(y, m, ingresos, allFijos, mensuales, allCuotas, pausadas, rateFor);
+    const resumen = calcularResumen(y, m, ingresos, allFijos, mensuales, allCuotas, pausadas, rateFor, ahorroPorMes.get(`${y}-${m}`) ?? 0);
     result.push({ ...resumen, label: `${MONTH_LABELS[m - 1]} ${y}` });
   }
 
