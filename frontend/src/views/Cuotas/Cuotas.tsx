@@ -487,7 +487,7 @@ export default function Cuotas() {
             </div>
             <div className="form__row">
               <div className="form__field">
-                <label className="form__label">Cuota actual</label>
+                <label className="form__label">N° de cuota en el mes de inicio</label>
                 <input className="form__input" type="number" min={1} value={form.cuota_actual} onChange={(e) => setForm({ ...form, cuota_actual: parseInt(e.target.value) || 1 })} />
               </div>
               <div className="form__field">
@@ -507,6 +507,18 @@ export default function Cuotas() {
                 <input className="form__input" type="number" value={form.anio_inicio} onChange={(e) => setForm({ ...form, anio_inicio: parseInt(e.target.value) || now.getFullYear() })} />
               </div>
             </div>
+            {(() => {
+              // Misma fórmula que la tabla: cuota_actual es la que corresponde al mes de inicio.
+              const hoyN = form.cuota_actual + (now.getFullYear() - form.anio_inicio) * 12 + (now.getMonth() + 1 - form.mes_inicio);
+              const ult  = form.anio_inicio * 12 + (form.mes_inicio - 1) + (form.total_cuotas - form.cuota_actual);
+              const ultTxt = `${MONTHS[((ult % 12) + 12) % 12]} ${Math.floor(ult / 12)}`;
+              const hoyTxt = hoyN > form.total_cuotas ? "terminada" : hoyN < 1 ? "todavía no empezó" : `cuota ${hoyN}/${form.total_cuotas}`;
+              return (
+                <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+                  Si es la 1ª cuota, dejá 1. Con estos datos, este mes estás en <strong style={{ color: "var(--text-primary)" }}>{hoyTxt}</strong> y el último cobro es en <strong style={{ color: "var(--text-primary)" }}>{ultTxt}</strong>.
+                </div>
+              );
+            })()}
             {tarjetas.length > 0 && (
               <div className="form__field">
                 <label className="form__label">Tarjeta</label>
