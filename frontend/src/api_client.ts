@@ -607,7 +607,9 @@ export const metasApi = {
 
   depositar: async (id: number, monto: number, fecha?: string) => {
     const userId = await uid();
-    const fechaFinal = fecha ?? new Date().toISOString().split("T")[0];
+    // fecha local (toISOString da la UTC y de noche en AR cae en el día siguiente)
+    const hoy = new Date();
+    const fechaFinal = fecha ?? `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`;
     const { error: e1 } = await supabase
       .from("depositos_ahorro")
       .insert({ meta_id: id, monto, fecha: fechaFinal, user_id: userId });

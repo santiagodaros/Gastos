@@ -192,13 +192,13 @@ export default function Dashboard() {
           {(() => {
             const base = resumen.sueldo > 0 ? resumen.sueldo : resumen.ingresos;
             if (base <= 0) return null;
-            const rows: { label: string; value: number; color: string }[] = [
+            const rows: { label: string; value: number; color: string; ocultarEnCero?: boolean }[] = [
               { label: "Ingresos", value: resumen.ingresos, color: "var(--positive)" },
               { label: "Gastos", value: resumen.total_gastos, color: "var(--negative)" },
               { label: "Cuotas", value: resumen.cuotas, color: "var(--warning)" },
-              { label: "Ahorro", value: resumen.ahorro, color: "var(--accent)" },
+              { label: resumen.ahorro < 0 ? "Retiro de ahorro" : "Ahorro", value: resumen.ahorro, color: "var(--accent)", ocultarEnCero: true },
               { label: "Balance", value: resumen.balance, color: resumen.balance >= 0 ? "var(--positive)" : "var(--negative)" },
-            ].filter((r) => r.label !== "Ahorro" || r.value > 0);
+            ].filter((r) => !r.ocultarEnCero || r.value !== 0);
             return (
               <Card className="dashboard__hero">
                 <div className="dashboard__hero-inner">
@@ -291,7 +291,7 @@ export default function Dashboard() {
               <p className="dashboard__section-title">Presupuesto del mes · sobre tu sueldo</p>
               {renderBudgetRow("Gastos", "var(--warning)",  resumen.gastos_fijos + resumen.gastos_mensuales, resumen.sueldo * presu.pct_gastos / 100)}
               {renderBudgetRow("Cuotas", "var(--negative)", resumen.cuotas, resumen.sueldo * presu.pct_cuotas / 100)}
-              {renderBudgetRow("Ahorro", "var(--positive)", ahorroMes, resumen.sueldo * presu.pct_ahorro / 100)}
+              {renderBudgetRow("Ahorro", "var(--positive)", Math.max(0, ahorroMes), resumen.sueldo * presu.pct_ahorro / 100)}
             </Card>
           )}
 
