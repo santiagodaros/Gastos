@@ -144,6 +144,7 @@ export interface Resumen {
   gastos_mensuales: number;
   cuotas: number;
   total_gastos: number;
+  ahorro: number;            // depositado en metas ese mes (ARS); resta del balance
   balance: number;
   dolar_rate: number;
 }
@@ -239,12 +240,13 @@ export const resumenApi = {
     await cotizacionesApi.ensureCurrent();
     const [current, rateMap] = await Promise.all([getDolarRate(), cotizacionesApi.getMap()]);
     const rateFor = makeRateFor(rateMap, current);
-    const [ingRes, fijRes, menRes, cuoRes, pauRes] = await Promise.all([
+    const [ingRes, fijRes, menRes, cuoRes, pauRes, ahorros] = await Promise.all([
       supabase.from("ingresos").select("*").eq("mes", mes).eq("anio", anio).maybeSingle(),
       supabase.from("gastos_fijos").select("*"),
       supabase.from("gastos_mensuales").select("*").eq("mes", mes).eq("anio", anio),
       supabase.from("cuotas").select("*").eq("activa", 1),
       supabase.from("cuotas_pausadas").select("cuota_id").eq("mes", mes).eq("anio", anio),
+      ahorroPorMes(rateFor),
     ]);
     return calcularResumen(
       anio, mes,
@@ -254,6 +256,7 @@ export const resumenApi = {
       ok(cuoRes.data, cuoRes.error, []),
       new Set((pauRes.data ?? []).map((p: { cuota_id: number }) => p.cuota_id)),
       rateFor,
+      ahorros.get(`${anio}-${mes}`) ?? 0,
     );
   },
 
@@ -657,12 +660,13 @@ export const historialApi = {
   get: async (meses: number): Promise<ResumenMes[]> => {
     const [current, rateMap] = await Promise.all([getDolarRate(), cotizacionesApi.getMap()]);
     const rateFor = makeRateFor(rateMap, current);
-    const [fijRes, ingRes, menRes, cuoRes, pauRes] = await Promise.all([
+    const [fijRes, ingRes, menRes, cuoRes, pauRes, ahorros] = await Promise.all([
       supabase.from("gastos_fijos").select("id, nombre, monto, activo, moneda, mes, anio, grupo_id, categoria, nota"),
       supabase.from("ingresos").select("id, mes, anio, sueldo, otros"),
       supabase.from("gastos_mensuales").select("id, mes, anio, nombre, monto, categoria, moneda, nota"),
       supabase.from("cuotas").select("id, nombre, monto_cuota, cuota_actual, total_cuotas, mes_inicio, anio_inicio, activa, moneda, tarjeta_id, categoria").eq("activa", 1),
       supabase.from("cuotas_pausadas").select("cuota_id, mes, anio"),
+      ahorroPorMes(rateFor),
     ]);
     return calcularHistorial(
       meses,
@@ -672,6 +676,7 @@ export const historialApi = {
       ok(cuoRes.data, cuoRes.error, []),
       ok(pauRes.data, pauRes.error, []),
       rateFor,
+      ahorros,
     );
   },
 };
@@ -874,19 +879,22 @@ export const resumenesApi = {
   },
 };
 
-// Ahorro depositado en metas durante un mes (usado como "ahorro usado" del presupuesto).
-export const ahorroMesApi = {
-  get: async (anio: number, mes: number): Promise<number> => {
-    const start = `${anio}-${String(mes).padStart(2, "0")}-01`;
-    const nextM = mes === 12 ? 1 : mes + 1;
-    const nextY = mes === 12 ? anio + 1 : anio;
-    const end = `${nextY}-${String(nextM).padStart(2, "0")}-01`;
-    const { data, error } = await supabase
-      .from("depositos_ahorro").select("monto, fecha").gte("fecha", start).lt("fecha", end);
-    if (error) return 0;
-    return (data ?? []).reduce((s: number, d: { monto: number }) => s + d.monto, 0);
-  },
-};
+// Ahorro depositado en metas, en ARS, agrupado por mes (clave "anio-mes").
+// Los depósitos están en la moneda de su meta: los USD se pesifican con la cotización de ese mes.
+async function ahorroPorMes(rateFor: (anio: number, mes: number) => number): Promise<Map<string, number>> {
+  const { data, error } = await supabase
+    .from("depositos_ahorro").select("monto, fecha, metas_ahorro(moneda)");
+  const out = new Map<string, number>();
+  if (error) return out;
+  type Row = { monto: number; fecha: string; metas_ahorro: { moneda: string } | { moneda: string }[] | null };
+  for (const d of (data ?? []) as unknown as Row[]) {
+    const [y, m] = d.fecha.split("-").map(Number);
+    const meta = Array.isArray(d.metas_ahorro) ? d.metas_ahorro[0] : d.metas_ahorro;
+    const ars = meta?.moneda === "USD" ? d.monto * rateFor(y, m) : d.monto;
+    out.set(`${y}-${m}`, (out.get(`${y}-${m}`) ?? 0) + ars);
+  }
+  return out;
+}
 
 // ─── Posiciones (cartera de cada meta) ────────────────────────────────────────
 
