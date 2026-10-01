@@ -1,14 +1,13 @@
 import { useState, useEffect } from "react";
-import { metasApi, type MetaAhorro, type MetaAhorroCreate } from "../../api_client";
+import { metasApi, posicionesApi, type MetaAhorro, type MetaAhorroCreate, type Posicion } from "../../api_client";
 import { Card } from "../../components/Card";
 import { Modal, ConfirmModal } from "../../components/Modal";
 import { useToast } from "../../components/Toast";
+import { cotizarPosiciones } from "../../lib/market";
+import { getCotizacionDolar } from "../../lib/finance";
+import { CarteraPanel, CarteraModal, fmtMoneda, type Cotizaciones } from "./Cartera";
 import "../../styles/abm.css";
 import "./Metas.css";
-
-function fmt(n: number) {
-  return n.toLocaleString("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
-}
 
 // Meses desde hoy hasta una fecha. Mínimo 1.
 function mesesHasta(fechaStr: string | null): number {
@@ -47,6 +46,7 @@ const EMPTY_FORM: MetaAhorroCreate = {
   tasa_rendimiento: 0,
   tipo: "meta",
   aporte_mensual: 0,
+  moneda: "ARS",
 };
 
 export default function Metas() {
@@ -54,6 +54,11 @@ export default function Metas() {
   const [items, setItems]       = useState<MetaAhorro[]>([]);
   const [loading, setLoading]   = useState(true);
   const [saving, setSaving]     = useState(false);
+
+  const [posiciones, setPosiciones] = useState<Posicion[]>([]);
+  const [cots, setCots]         = useState<Cotizaciones>(new Map());
+  const [dolar, setDolar]       = useState(1);
+  const [carteraMeta, setCarteraMeta] = useState<MetaAhorro | null>(null);
 
   const [modal, setModal]       = useState<"add" | "edit" | "depositar" | null>(null);
   const [editItem, setEditItem] = useState<MetaAhorro | null>(null);
@@ -64,8 +69,14 @@ export default function Metas() {
 
   function load() {
     setLoading(true);
-    metasApi.list()
-      .then(setItems)
+    Promise.all([metasApi.list(), posicionesApi.list()])
+      .then(([metas, pos]) => {
+        setItems(metas);
+        setPosiciones(pos);
+        // las cotizaciones llegan después: no bloquean el render de las cards
+        cotizarPosiciones(pos).then(setCots);
+        getCotizacionDolar().then(setDolar);
+      })
       .finally(() => setLoading(false));
   }
 
@@ -88,6 +99,7 @@ export default function Metas() {
       tasa_rendimiento: item.tasa_rendimiento ?? 0,
       tipo: item.tipo ?? "meta",
       aporte_mensual: item.aporte_mensual ?? 0,
+      moneda: item.moneda ?? "ARS",
     });
     setEditItem(item);
     setModal("edit");
@@ -186,6 +198,19 @@ export default function Metas() {
           {items.map((item) => {
             const tna    = item.tasa_rendimiento ?? 0;
             const meses  = mesesHasta(item.fecha_limite);
+            const mon    = item.moneda ?? "ARS";
+            const fmt    = (n: number) => fmtMoneda(n, mon);
+            const posMeta = posiciones.filter((p) => p.meta_id === item.id);
+            const cartera = posMeta.length > 0 && (
+              <CarteraPanel meta={item} posiciones={posMeta} cots={cots} dolar={dolar} />
+            );
+            const botonCartera = (
+              <button className="btn-ghost" style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-3)" }}
+                onClick={() => setCarteraMeta(item)}>
+                {posMeta.length > 0 ? `Cartera (${posMeta.length})` : "+ Cartera"}
+              </button>
+            );
+            const monBadge = <span className={`badge ${mon === "USD" ? "badge--positive" : "badge--neutral"}`}>{mon}</span>;
 
             // ── Card de INVERSIÓN (sin objetivo, con horizonte) ──
             if (item.tipo === "inversion") {
@@ -199,6 +224,7 @@ export default function Metas() {
                     <div className="meta-card__header">
                       <span className="meta-card__nombre" style={{ opacity: item.activa ? 1 : 0.5 }}>{item.nombre}</span>
                       <div style={{ display: "flex", gap: "var(--space-1)", alignItems: "center" }}>
+                        {monBadge}
                         <span className="badge badge--accent">Inversión</span>
                         {!item.activa && <span className="badge badge--neutral">Inactiva</span>}
                       </div>
@@ -232,8 +258,13 @@ export default function Metas() {
                       </div>
                     </div>
 
+                    {cartera}
+
                     <div className="meta-card__actions">
-                      <button className="btn-ghost" style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-3)" }} onClick={() => openDepositar(item)}>+ Aportar</button>
+                      <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                        <button className="btn-ghost" style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-3)" }} onClick={() => openDepositar(item)}>+ Aportar</button>
+                        {botonCartera}
+                      </div>
                       <div style={{ display: "flex", gap: "var(--space-1)" }}>
                         <button className="row-action-btn" onClick={() => openEdit(item)} title="Editar">
                           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -275,6 +306,7 @@ export default function Metas() {
                       {item.nombre}
                     </span>
                     <div style={{ display: "flex", gap: "var(--space-1)", alignItems: "center" }}>
+                      {monBadge}
                       <span className={`badge ${pri.cls}`}>{pri.label}</span>
                       {!item.activa && <span className="badge badge--neutral">Inactiva</span>}
                     </div>
@@ -368,15 +400,20 @@ export default function Metas() {
                     </div>
                   )}
 
+                  {cartera}
+
                   {/* Acciones */}
                   <div className="meta-card__actions">
-                    <button
-                      className="btn-ghost"
-                      style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-3)" }}
-                      onClick={() => openDepositar(item)}
-                    >
-                      + Depositar
-                    </button>
+                    <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                      <button
+                        className="btn-ghost"
+                        style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-3)" }}
+                        onClick={() => openDepositar(item)}
+                      >
+                        + Depositar
+                      </button>
+                      {botonCartera}
+                    </div>
                     <div style={{ display: "flex", gap: "var(--space-1)" }}>
                       <button className="row-action-btn" onClick={() => openEdit(item)} title="Editar">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -415,16 +452,29 @@ export default function Metas() {
                 autoFocus
               />
             </div>
-            <div className="form__field">
-              <label className="form__label">Tipo</label>
-              <select
-                className="form__select"
-                value={form.tipo}
-                onChange={(e) => setForm({ ...form, tipo: e.target.value })}
-              >
-                <option value="meta">Meta con objetivo</option>
-                <option value="inversion">Inversión (abierta, con horizonte)</option>
-              </select>
+            <div className="form__row">
+              <div className="form__field">
+                <label className="form__label">Tipo</label>
+                <select
+                  className="form__select"
+                  value={form.tipo}
+                  onChange={(e) => setForm({ ...form, tipo: e.target.value })}
+                >
+                  <option value="meta">Meta con objetivo</option>
+                  <option value="inversion">Inversión (abierta, con horizonte)</option>
+                </select>
+              </div>
+              <div className="form__field">
+                <label className="form__label">Moneda</label>
+                <select
+                  className="form__select"
+                  value={form.moneda}
+                  onChange={(e) => setForm({ ...form, moneda: e.target.value })}
+                >
+                  <option value="ARS">Pesos (ARS)</option>
+                  <option value="USD">Dólares (USD)</option>
+                </select>
+              </div>
             </div>
             <div className="form__row">
               {form.tipo === "meta" && (
@@ -531,8 +581,8 @@ export default function Metas() {
         <Modal title={`Depositar — ${editItem.nombre}`} size="sm" onClose={() => setModal(null)}>
           <form className="form" onSubmit={handleDepositar}>
             <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", marginBottom: "var(--space-2)" }}>
-              Acumulado actual: <strong style={{ color: "var(--positive)" }}>{fmt(editItem.acumulado)}</strong>
-              {editItem.objetivo > 0 && <>{" / "}{fmt(editItem.objetivo)}</>}
+              Acumulado actual: <strong style={{ color: "var(--positive)" }}>{fmtMoneda(editItem.acumulado, editItem.moneda)}</strong>
+              {editItem.objetivo > 0 && <>{" / "}{fmtMoneda(editItem.objetivo, editItem.moneda)}</>}
             </div>
             <div className="form__field">
               <label className="form__label">Monto a depositar</label>
@@ -555,6 +605,16 @@ export default function Metas() {
             </div>
           </form>
         </Modal>
+      )}
+
+      {carteraMeta && (
+        <CarteraModal
+          meta={carteraMeta}
+          posiciones={posiciones.filter((p) => p.meta_id === carteraMeta.id)}
+          cots={cots}
+          onClose={() => setCarteraMeta(null)}
+          onChanged={load}
+        />
       )}
 
       {toDelete && (
