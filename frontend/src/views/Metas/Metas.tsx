@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { metasApi, posicionesApi, type MetaAhorro, type MetaAhorroCreate, type Posicion } from "../../api_client";
 import { Card } from "../../components/Card";
 import { Modal, ConfirmModal } from "../../components/Modal";
@@ -65,6 +65,8 @@ export default function Metas() {
   const [form, setForm]         = useState<MetaAhorroCreate>({ ...EMPTY_FORM });
   const [deposito, setDeposito] = useState(0);
   const [fechaDep, setFechaDep] = useState("");
+  const [retiro, setRetiro]     = useState(false);   // true: el monto sale de la meta
+  const enviando = useRef(false);                    // evita el doble envío (doble clic)
   const [toDelete, setToDelete] = useState<MetaAhorro | null>(null);
   const [deleting, setDeleting] = useState(false);
 
@@ -106,8 +108,9 @@ export default function Metas() {
     setModal("edit");
   }
 
-  function openDepositar(item: MetaAhorro) {
+  function openDepositar(item: MetaAhorro, esRetiro = false) {
     setEditItem(item);
+    setRetiro(esRetiro);
     setDeposito(0);
     const hoy = new Date();
     setFechaDep(`${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, "0")}-${String(hoy.getDate()).padStart(2, "0")}`);
@@ -136,16 +139,23 @@ export default function Metas() {
 
   async function handleDepositar(e: React.FormEvent) {
     e.preventDefault();
-    if (!editItem || deposito <= 0) return;
+    if (!editItem || deposito <= 0 || enviando.current) return;
+    if (retiro && deposito > editItem.acumulado) {
+      toast.error("No podés retirar más que el acumulado");
+      return;
+    }
+    enviando.current = true;
     setSaving(true);
     try {
-      await metasApi.depositar(editItem.id, deposito, fechaDep || undefined);
-      toast.success("Depósito registrado");
+      // un retiro es un depósito negativo: baja el acumulado y el ahorro de ese mes
+      await metasApi.depositar(editItem.id, retiro ? -deposito : deposito, fechaDep || undefined);
+      toast.success(retiro ? "Retiro registrado" : "Depósito registrado");
       setModal(null);
       load();
     } catch (e: unknown) {
       toast.error((e as Error).message);
     } finally {
+      enviando.current = false;
       setSaving(false);
     }
   }
@@ -213,6 +223,10 @@ export default function Metas() {
                 {posMeta.length > 0 ? `Cartera (${posMeta.length})` : "+ Cartera"}
               </button>
             );
+            const botonRetirar = item.acumulado > 0 && (
+              <button className="btn-ghost" style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-3)" }}
+                onClick={() => openDepositar(item, true)}>− Retirar</button>
+            );
             const monBadge = <span className={`badge ${mon === "USD" ? "badge--positive" : "badge--neutral"}`}>{mon}</span>;
 
             // ── Card de INVERSIÓN (sin objetivo, con horizonte) ──
@@ -264,8 +278,9 @@ export default function Metas() {
                     {cartera}
 
                     <div className="meta-card__actions">
-                      <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                      <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
                         <button className="btn-ghost" style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-3)" }} onClick={() => openDepositar(item)}>+ Aportar</button>
+                        {botonRetirar}
                         {botonCartera}
                       </div>
                       <div style={{ display: "flex", gap: "var(--space-1)" }}>
@@ -407,7 +422,7 @@ export default function Metas() {
 
                   {/* Acciones */}
                   <div className="meta-card__actions">
-                    <div style={{ display: "flex", gap: "var(--space-2)" }}>
+                    <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
                       <button
                         className="btn-ghost"
                         style={{ fontSize: "var(--text-xs)", padding: "var(--space-1) var(--space-3)" }}
@@ -415,6 +430,7 @@ export default function Metas() {
                       >
                         + Depositar
                       </button>
+                      {botonRetirar}
                       {botonCartera}
                     </div>
                     <div style={{ display: "flex", gap: "var(--space-1)" }}>
@@ -581,14 +597,14 @@ export default function Metas() {
 
       {/* Depositar modal */}
       {modal === "depositar" && editItem && (
-        <Modal title={`Depositar — ${editItem.nombre}`} size="sm" onClose={() => setModal(null)}>
+        <Modal title={`${retiro ? "Retirar" : "Depositar"} — ${editItem.nombre}`} size="sm" onClose={() => setModal(null)}>
           <form className="form" onSubmit={handleDepositar}>
             <div style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", marginBottom: "var(--space-2)" }}>
               Acumulado actual: <strong style={{ color: "var(--positive)" }}>{fmtMoneda(editItem.acumulado, editItem.moneda)}</strong>
               {editItem.objetivo > 0 && <>{" / "}{fmtMoneda(editItem.objetivo, editItem.moneda)}</>}
             </div>
             <div className="form__field">
-              <label className="form__label">Monto a depositar</label>
+              <label className="form__label">{retiro ? "Monto a retirar" : "Monto a depositar"}</label>
               <input
                 className="form__input"
                 type="number"
@@ -610,13 +626,15 @@ export default function Metas() {
                 required
               />
               <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: "var(--space-1)" }}>
-                Cuenta como ahorro del mes de esta fecha. Si invertís con el sueldo del mes pasado, poné una fecha de ese mes.
+                {retiro
+                  ? "La plata vuelve a estar disponible en el mes de esta fecha."
+                  : "Cuenta como ahorro del mes de esta fecha. Si invertís con el sueldo del mes pasado, poné una fecha de ese mes."}
               </div>
             </div>
             <div className="form__actions">
               <button type="button" className="btn-ghost" onClick={() => setModal(null)}>Cancelar</button>
               <button type="submit" className="btn-primary" disabled={saving || deposito <= 0}>
-                {saving ? "Procesando..." : "Depositar"}
+                {saving ? "Procesando..." : retiro ? "Retirar" : "Depositar"}
               </button>
             </div>
           </form>
