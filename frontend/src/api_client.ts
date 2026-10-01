@@ -118,8 +118,21 @@ export interface MetaAhorro {
   tasa_rendimiento: number;
   tipo: string;              // 'meta' | 'inversion'
   aporte_mensual: number;    // aporte mensual estimado (para inversiones)
+  moneda: string;            // 'ARS' | 'USD'
 }
 export type MetaAhorroCreate = Omit<MetaAhorro, "id">;
+
+export interface Posicion {
+  id: number;
+  meta_id: number;
+  tipo: string;              // fci | accion | cedear | bono | on | crypto | plazo_fijo | otro
+  ticker: string;
+  nombre: string | null;
+  cantidad: number;
+  precio_compra: number;     // PPC por unidad (bonos/ON: por 100 VN)
+  moneda: string;
+}
+export type PosicionCreate = Omit<Posicion, "id">;
 
 export interface Resumen {
   mes: number;
@@ -557,7 +570,7 @@ export const cuotasApi = {
 
 // ─── Metas de Ahorro ──────────────────────────────────────────────────────────
 
-const META_COLS = "id, nombre, objetivo, acumulado, fecha_limite, prioridad, activa, tasa_rendimiento, tipo, aporte_mensual";
+const META_COLS = "id, nombre, objetivo, acumulado, fecha_limite, prioridad, activa, tasa_rendimiento, tipo, aporte_mensual, moneda";
 
 export const metasApi = {
   list: async (): Promise<MetaAhorro[]> => {
@@ -872,5 +885,36 @@ export const ahorroMesApi = {
       .from("depositos_ahorro").select("monto, fecha").gte("fecha", start).lt("fecha", end);
     if (error) return 0;
     return (data ?? []).reduce((s: number, d: { monto: number }) => s + d.monto, 0);
+  },
+};
+
+// ─── Posiciones (cartera de cada meta) ────────────────────────────────────────
+
+const POS_COLS = "id, meta_id, tipo, ticker, nombre, cantidad, precio_compra, moneda";
+
+export const posicionesApi = {
+  list: async (): Promise<Posicion[]> => {
+    const { data, error } = await supabase.from("posiciones").select(POS_COLS).order("id");
+    // la tabla puede no existir todavía (falta correr supabase/portfolio.sql)
+    if (error) return [];
+    return (data ?? []) as Posicion[];
+  },
+
+  create: async (body: PosicionCreate): Promise<Posicion> => {
+    const { data, error } = await supabase
+      .from("posiciones").insert({ ...body, user_id: await uid() }).select(POS_COLS).single();
+    return ok(data, error);
+  },
+
+  update: async (id: number, body: PosicionCreate): Promise<Posicion> => {
+    const { data, error } = await supabase
+      .from("posiciones").update(body).eq("id", id).select(POS_COLS).single();
+    return ok(data, error);
+  },
+
+  delete: async (id: number) => {
+    const { error } = await supabase.from("posiciones").delete().eq("id", id);
+    if (error) throw new Error(error.message);
+    return { deleted: true };
   },
 };
