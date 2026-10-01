@@ -135,11 +135,11 @@ export default function Cuotas() {
     setExpandedMes((prev) => { const k = mesKey(item.mes, item.anio); return prev === k ? null : k; });
   }
 
-  // Una cuota está "terminada" cuando su última cuota ya pasó (por fecha).
-  // Sigue en la DB (historial), pero deja de contar y se puede ocultar.
+  // Una cuota está "terminada" el mes SIGUIENTE a su último cobro.
+  // Último cobro = inicio + (total - cuota_actual); respeta cuotas ya empezadas.
   const curPeriod = now.getFullYear() * 12 + now.getMonth() + 1;
   const isFinished = (c: Cuota) =>
-    c.anio_inicio * 12 + c.mes_inicio + c.total_cuotas - 1 < curPeriod;
+    c.anio_inicio * 12 + c.mes_inicio + (c.total_cuotas - c.cuota_actual) < curPeriod;
 
   const terminadas = items.filter(isFinished);
   const vigentes   = items.filter((c) => !isFinished(c));

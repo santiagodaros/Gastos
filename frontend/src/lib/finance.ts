@@ -172,7 +172,7 @@ export function calcularProyeccion(
     let totalArs = 0;
 
     for (const c of cuotas) {
-      const numero = y * 12 + m - (c.anio_inicio * 12 + c.mes_inicio) + 1;
+      const numero = c.cuota_actual + (y * 12 + m) - (c.anio_inicio * 12 + c.mes_inicio);
       if (numero >= 1 && numero <= c.total_cuotas) {
         const montoArs = c.moneda === "USD" ? c.monto_cuota * dolarRate : c.monto_cuota;
         totalArs += montoArs;

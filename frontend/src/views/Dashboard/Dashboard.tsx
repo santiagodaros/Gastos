@@ -72,7 +72,7 @@ export default function Dashboard() {
         const pronto = cuotas
           .filter((c) => c.activa)
           .map((c) => {
-            const endPeriod = c.anio_inicio * 12 + c.mes_inicio + c.total_cuotas - 1;
+            const endPeriod = c.anio_inicio * 12 + c.mes_inicio + (c.total_cuotas - c.cuota_actual);
             const remaining = endPeriod - currentPeriod + 1;
             return { ...c, remaining };
           })
